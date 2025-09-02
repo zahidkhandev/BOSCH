@@ -1,3 +1,7 @@
-d = {1 : 1, 2 : '2', '1' : 1, '2' : 3} 
-d['1'] = 2
-print(d[d[d[str(d[1])]]]) 
+x = ['ab', 'cd']
+y = x.copy()
+for i in x:
+    # print(i.upper())
+    y.append(i.upper())
+
+print(y)
