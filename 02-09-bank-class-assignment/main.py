@@ -1,10 +1,9 @@
 class BankAccount:
     
-    def __init__(self, account_number, account_holder, balance, interest_rate):
+    def __init__(self, account_number, account_holder, balance):
         self.account_number = account_number
         self.account_holder = account_holder
         self.balance = balance if (balance != 0 or None) else 0
-        self.interest_rate = interest_rate
 
     def deposit(self, amount):
         if (amount < 0):
@@ -22,16 +21,20 @@ class BankAccount:
         return f"\nAccount Number: {self.account_number}, Account Holder: {self.account_holder}, Account balance: {self.balance}\n"
     
 
+class SavingsAccount(BankAccount):
+    def __init__(self, account_number, account_holder, balance, interest_rate):
+        super().__init__(account_number, account_holder, balance)
+        self.interest_rate = interest_rate
+    
     def applyInterest(self):
         interest_amount = int(self.balance) * int(self.interest_rate) / 100
         self.balance += interest_amount
         print(f"Interest of {interest_amount} has been credited, closing balance: {self.balance}")
     
-    
 class CurrentAccount(BankAccount):
     
-    def __init__(self,account_number, account_holder, balance, interest_rate,overdraft_limit):
-        super().__init__(account_number, account_holder, balance, interest_rate)
+    def __init__(self,account_number, account_holder, balance,overdraft_limit):
+        super().__init__(account_number, account_holder, balance)
         self.overdraft_limit = overdraft_limit
     
     
@@ -63,14 +66,14 @@ class CurrentAccount(BankAccount):
                 return False
 
 
-person1 = CurrentAccount(account_number="12345", account_holder="John", balance=5000, interest_rate=10, overdraft_limit=1000)
-
+person1 = CurrentAccount(account_number="12345", account_holder="John", balance=5000, overdraft_limit=1000)
+person1_savings = SavingsAccount(account_number="12345", account_holder="John", balance=5000, interest_rate=10)
 person1.deposit(1000)
 person1.withdraw(5000)
 person1.getBalance()
 print(person1)
 
-person1.applyInterest()
+person1_savings.applyInterest()
 person1.getBalance()
 
 person1.withdraw(3000)
@@ -79,7 +82,7 @@ person1.withdraw(-10)
 person1.deposit(-10)
 
 print("\n")
-person2 = CurrentAccount(account_number="54321", account_holder="Sam", balance=25000, interest_rate=10, overdraft_limit=1000)
+person2 = CurrentAccount(account_number="54321", account_holder="Sam", balance=25000, overdraft_limit=1000)
 person2.getBalance()
 person2.transfer(destination_account=person1, amount=10000)
 
