@@ -19,9 +19,7 @@ class BankAccount:
         print(f"Balance of account {self.account_number}: {self.balance}")
 
     def __str__(self):
-        print("Account Number: ", self.account_number)
-        print("Account Holder: ", self.account_holder)
-        print("Account Balance: ", self.balance)
+        return f"\nAccount Number: {self.account_number}, Account Holder: {self.account_holder}, Account balance: {self.balance}\n"
     
 
     def applyInterest(self):
@@ -70,7 +68,8 @@ person1 = CurrentAccount(account_number="12345", account_holder="John", balance=
 person1.deposit(1000)
 person1.withdraw(5000)
 person1.getBalance()
-person1.__str__()
+person1_bank_info = person1.__str__()
+print(person1_bank_info)
 
 person1.applyInterest()
 person1.getBalance()
