@@ -68,8 +68,7 @@ person1 = CurrentAccount(account_number="12345", account_holder="John", balance=
 person1.deposit(1000)
 person1.withdraw(5000)
 person1.getBalance()
-person1_bank_info = person1.__str__()
-print(person1_bank_info)
+print(person1)
 
 person1.applyInterest()
 person1.getBalance()
