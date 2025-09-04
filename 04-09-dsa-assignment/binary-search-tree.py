@@ -50,14 +50,14 @@ class BST:
 
     def preorder(self):
         result = []
-        self._preorder_recursive(self.root, result)
+        self.preOrderRecursive(self.root, result)
         return result
 
-    def _preorder_recursive(self, node, result):
+    def preOrderRecursive(self, node, result):
         if node:
             result.append(node.value)
-            self._preorder_recursive(node.left, result)
-            self._preorder_recursive(node.right, result)
+            self.preOrderRecursive(node.left, result)
+            self.preOrderRecursive(node.right, result)
 
     def postorder(self):
         result = []
