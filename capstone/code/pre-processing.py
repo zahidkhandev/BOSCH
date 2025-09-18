@@ -81,13 +81,18 @@ def process_sensor_data(file_path):
     df['Power_Proxy_kW'] = df['GTT'] * angular_velocity_rad_s
     print("Derived Power Output Proxy (kW) created.")
     
+    # --- Calculate Total Decay Score ---
+    # A healthy component has a decay coeff of 1. The score represents the sum of deviations from healthy.
+    df['total_decay_score'] = (1 - df['decay_coeff_comp']) + (1 - df['decay_coeff_turbine'])
+    print("Derived Total Decay Score created.")
+
     print("\n--- 4. Finalizing DataFrame ---")
     
     print("\nFinal DataFrame head with new features:")
     print(df.head())
 
     print("\nDescriptive Statistics for key new features:")
-    print(df[['Power_Proxy_kW', 'T1_P1_ratio', 'T2_P2_ratio', 'T48_P48_ratio', 'Propeller_Torque_Diff']].describe())
+    print(df[['Power_Proxy_kW', 'T1_P1_ratio', 'T2_P2_ratio', 'T48_P48_ratio', 'Propeller_Torque_Diff', 'total_decay_score']].describe())
     
     return df
 
@@ -102,6 +107,10 @@ if __name__ == '__main__':
     if processed_df is not None:
         try:
             os.makedirs(output_folder_path, exist_ok=True)
+            
+            # Add a verification print statement before saving
+            print(f"\nColumns being saved to CSV: {processed_df.columns.tolist()}")
+            
             processed_df.to_csv(output_file_path, index=False)
             
             print(f"\n--- 5. Data Export ---")
