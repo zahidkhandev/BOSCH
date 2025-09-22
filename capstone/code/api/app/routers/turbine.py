@@ -32,11 +32,25 @@ def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
 
     gamma = 1.4
     k_to_c = 273.15
+    
     df['pressure_ratio'] = df['p2'] / df['p1']
     t1_k, t2_k = df['t1'] + k_to_c, df['t2'] + k_to_c
     t2s_k = t1_k * (df['pressure_ratio']**((gamma - 1) / gamma))
     df['compressor_efficiency'] = ((t2s_k - t1_k) / (t2_k - t1_k)) * 100
     df['thermal_efficiency'] = (1 - (1 / (df['pressure_ratio']**((gamma - 1) / gamma)))) * 100
+    
+    df['temp_ratio_t48_p48'] = df['t48'] / df['p48']
+    df['temp_ratio_t1_p1'] = df['t1'] / df['p1']
+    df['temp_ratio_t2_p2'] = df['t2'] / df['p2']
+    df['torque_diff'] = df['ts'] - df['tp']
+    df['rpm_ratio_gtn_ggn'] = df['gtn'] / df['ggn']
+    df['fuel_per_rpm'] = df['mf'] / df['gtn']
+    df['total_prop_torque'] = df['ts'] + df['tp']
+    
+    angular_velocity_rad_s = df['gtn'] * (2 * np.pi / 60)
+    df['power_proxy_kw'] = (df['gtt'] * angular_velocity_rad_s)
+    df['total_decay_score'] = (1 - df['decay_coeff_comp']) + (1 - df['decay_coeff_turbine'])
+    
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     summary_groups = df.groupby('turbine_id').agg(
@@ -48,16 +62,21 @@ def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
         avg_thermal_efficiency_percent=('thermal_efficiency', 'mean'),
         avg_compressor_efficiency_percent=('compressor_efficiency', 'mean'),
         avg_compressor_decay=('decay_coeff_comp', 'mean'),
-        avg_turbine_decay=('decay_coeff_turbine', 'mean')
+        avg_turbine_decay=('decay_coeff_turbine', 'mean'),
+        avg_power_proxy_kw=('power_proxy_kw', 'mean'),
+        avg_total_decay_score=('total_decay_score', 'mean'),
+        avg_temp_ratio_t48_p48=('temp_ratio_t48_p48', 'mean'),
+        avg_temp_ratio_t1_p1=('temp_ratio_t1_p1', 'mean'),
+        avg_temp_ratio_t2_p2=('temp_ratio_t2_p2', 'mean'),
+        avg_torque_diff=('torque_diff', 'mean'),
+        avg_rpm_ratio_gtn_ggn=('rpm_ratio_gtn_ggn', 'mean'),
+        avg_fuel_per_rpm=('fuel_per_rpm', 'mean'),
+        avg_total_prop_torque=('total_prop_torque', 'mean')
     ).reset_index()
 
     return summary_groups.to_dict(orient='records')
 
 def log_anomaly(turbine_id: int, timestamp: str, description: str, severity: str):
-    """
-    Helper function to insert an anomaly into the database using a new connection from the engine,
-    making it safe to call from the async upload endpoint.
-    """
     with engine.connect() as connection:
         with connection.begin(): 
             connection.execute(
@@ -73,14 +92,6 @@ def log_anomaly(turbine_id: int, timestamp: str, description: str, severity: str
 
 @router.post("/upload-data/{turbine_id}", status_code=status.HTTP_201_CREATED, summary="Upload, Process, Store, and Analyze Data for Anomalies (ETL)")
 async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...)):
-    """
-    This endpoint performs a full ETL pipeline on uploaded CSV data.
-    
-    - **Extract**: Reads and validates the CSV.
-    - **Transform**: Cleans, smooths, and enriches the data.
-    - **Analyze & Alert**: Checks data against predefined thresholds and automatically logs anomalies.
-    - **Load**: Appends the cleaned sensor data to the database.
-    """
     with engine.connect() as connection:
         result = connection.execute(
             sql_text("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = :id"),
@@ -151,12 +162,11 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
             desc = f"Medium Compressor Decay Detected: {row['decay_coeff_comp']:.4f}"
             log_anomaly(turbine_id, row['timestamp'], desc, "Medium")
             alerts_found.append(desc)
-        if row['pressure_ratio'] < 9.0 and row['gtn'] > 1500: # Check only when running at speed
+        if row['pressure_ratio'] < 9.0 and row['gtn'] > 1500:
             desc = f"Low Pressure Ratio at Speed: {row['pressure_ratio']:.2f}"
             log_anomaly(turbine_id, row['timestamp'], desc, "Low")
             alerts_found.append(desc)
 
-    # --- LOAD ---
     df = df.round(4)
     df['turbine_id'] = turbine_id
     load_df = df[required_cols + ['turbine_id']]
@@ -223,11 +233,24 @@ def calculate_analytics(df: pd.DataFrame):
     df.columns = df.columns.str.lower()
     gamma = 1.4
     k_to_c = 273.15
+
     df['pressure_ratio'] = df['p2'] / df['p1']
     t1_k, t2_k = df['t1'] + k_to_c, df['t2'] + k_to_c
     t2s_k = t1_k * (df['pressure_ratio']**((gamma - 1) / gamma))
     df['compressor_efficiency'] = ((t2s_k - t1_k) / (t2_k - t1_k)) * 100
     df['thermal_efficiency'] = (1 - (1 / (df['pressure_ratio']**((gamma - 1) / gamma)))) * 100
+    
+    df['temp_ratio_t48_p48'] = df['t48'] / df['p48']
+    df['temp_ratio_t1_p1'] = df['t1'] / df['p1']
+    df['temp_ratio_t2_p2'] = df['t2'] / df['p2']
+    df['torque_diff'] = df['ts'] - df['tp']
+    df['rpm_ratio_gtn_ggn'] = df['gtn'] / df['ggn']
+    df['fuel_per_rpm'] = df['mf'] / df['gtn']
+    df['total_prop_torque'] = df['ts'] + df['tp']
+    angular_velocity_rad_s = df['gtn'] * (2 * np.pi / 60)
+    df['power_proxy_kw'] = df['gtt'] * angular_velocity_rad_s
+    df['total_decay_score'] = (1 - df['decay_coeff_comp']) + (1 - df['decay_coeff_turbine'])
+
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     def get_stats(series):
@@ -253,20 +276,31 @@ def calculate_analytics(df: pd.DataFrame):
             exit_pressure_p48=get_stats(df['p48']),
             shaft_torque_gtt=get_stats(df['gtt']),
             rpm_gtn=get_stats(df['gtn']),
-            generator_rpm_ggn=get_stats(df['ggn'])
+            generator_rpm_ggn=get_stats(df['ggn']),
+            power_proxy_kw=get_stats(df['power_proxy_kw'])
         ),
         efficiency_metrics=models.EfficiencyMetrics(
             thermal_efficiency_percent=get_stats(df['thermal_efficiency']),
-            compressor_efficiency_percent=get_stats(df['compressor_efficiency'])
+            compressor_efficiency_percent=get_stats(df['compressor_efficiency']),
+            fuel_per_rpm=get_stats(df['fuel_per_rpm']),
+            rpm_ratio_gtn_ggn=get_stats(df['rpm_ratio_gtn_ggn'])
+        ),
+        decay_metrics=models.DecayMetrics(
+            total_decay_score=get_stats(df['total_decay_score'])
+        ),
+        temp_pressure_ratios=models.TemperaturePressureRatios(
+            temp_ratio_t48_p48=get_stats(df['temp_ratio_t48_p48']),
+            temp_ratio_t1_p1=get_stats(df['temp_ratio_t1_p1']),
+            temp_ratio_t2_p2=get_stats(df['temp_ratio_t2_p2'])
+        ),
+        torque_metrics=models.TorqueMetrics(
+            torque_diff=get_stats(df['torque_diff']),
+            total_prop_torque=get_stats(df['total_prop_torque'])
         )
     )
 
 @router.post("/sensor-reading/{turbine_id}", response_model=models.TurbineReading, status_code=status.HTTP_201_CREATED, summary="Append a Single Sensor Reading and Check for Anomalies")
 def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreate, db: sqlite3.Connection = Depends(get_db)):
-    """
-    Logs a single sensor reading and automatically checks it against predefined
-    thresholds to log any anomalies in the same transaction.
-    """
     cursor = db.cursor()
     
     cursor.execute("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = ?", (turbine_id,))

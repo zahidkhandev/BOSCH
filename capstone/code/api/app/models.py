@@ -2,7 +2,6 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, timedelta, datetime
 
-# Turbine Management Models
 class TurbineBase(BaseModel):
     location: Optional[str] = Field(None, example="North Sea Platform Alpha")
     manufacturer: Optional[str] = Field(None, example="Siemens")
@@ -19,7 +18,6 @@ class Turbine(TurbineBase):
     class Config:
         from_attributes = True
 
-# RESTORED MODEL: Contains only the fields stored in the database
 class TurbineReading(BaseModel):
     lp: float
     v: float
@@ -54,6 +52,15 @@ class HealthSummary(BaseModel):
     avg_compressor_efficiency_percent: float
     avg_compressor_decay: float
     avg_turbine_decay: float
+    avg_power_proxy_kw: float
+    avg_total_decay_score: float
+    avg_temp_ratio_t48_p48: float
+    avg_temp_ratio_t1_p1: float
+    avg_temp_ratio_t2_p2: float
+    avg_torque_diff: float
+    avg_rpm_ratio_gtn_ggn: float
+    avg_fuel_per_rpm: float
+    avg_total_prop_torque: float
 
 class Stats(BaseModel):
     min: float
@@ -73,10 +80,25 @@ class TurbineStats(BaseModel):
     shaft_torque_gtt: Stats
     rpm_gtn: Stats
     generator_rpm_ggn: Stats
+    power_proxy_kw: Stats
 
 class EfficiencyMetrics(BaseModel):
     thermal_efficiency_percent: Stats
     compressor_efficiency_percent: Stats
+    fuel_per_rpm: Stats
+    rpm_ratio_gtn_ggn: Stats
+    
+class DecayMetrics(BaseModel):
+    total_decay_score: Stats
+    
+class TemperaturePressureRatios(BaseModel):
+    temp_ratio_t48_p48: Stats
+    temp_ratio_t1_p1: Stats
+    temp_ratio_t2_p2: Stats
+
+class TorqueMetrics(BaseModel):
+    torque_diff: Stats
+    total_prop_torque: Stats
 
 class TurbineAnalyticsReport(BaseModel):
     record_count: int
@@ -85,6 +107,9 @@ class TurbineAnalyticsReport(BaseModel):
     compressor_stats: CompressorStats
     turbine_stats: TurbineStats
     efficiency_metrics: EfficiencyMetrics
+    decay_metrics: DecayMetrics
+    temp_pressure_ratios: TemperaturePressureRatios
+    torque_metrics: TorqueMetrics
 
 class TimeFilterRequest(BaseModel):
     turbine_ids: List[int] = Field(default=[1])

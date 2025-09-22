@@ -13,21 +13,22 @@
         .method-post { background-color: #10B981; color: white; }
         .method-get { background-color: #3B82F6; color: white; }
         .method-put { background-color: #F59E0B; color: white; }
+        .method-delete { background-color: #EF4444; color: white; }
         .sidebar-link { transition: all 0.2s ease-in-out; }
         .sidebar-link:hover { background-color: #374151; color: white; border-left: 3px solid #60A5FA; }
-        .formula-img { background-color: #F9FAFB; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; }
-        .code-block { background-color: #1F2937; color: #F3F4F6; padding: 1rem; border-radius: 0.5rem; margin-top: 0.5rem; font-family: monospace; }
+        .formula-img { background-color: #F9FAFB; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; display: block; max-width: 100%; }
+        .code-block { background-color: #1F2937; color: #F3F4F6; padding: 1rem; border-radius: 0.5rem; margin-top: 0.5rem; font-family: monospace; white-space: pre-wrap; word-break: break-all;}
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
 
     <div class="flex">
-        <!-- Sidebar -->
         <aside class="w-1/4 h-screen bg-gray-800 text-gray-300 p-6 fixed overflow-y-auto">
             <h1 class="text-2xl font-bold mb-6 text-white">API Documentation</h1>
             <nav>
                 <ul class="space-y-2">
                     <li><a href="#introduction" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">Introduction</a></li>
+                    <li><a href="#authentication" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">Authentication</a></li>
                     <li><a href="#analytics-deep-dive" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">Analytics Deep Dive</a></li>
                     <li><a href="#etl-pipeline" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">ETL & Anomaly Detection</a></li>
                     
@@ -44,38 +45,53 @@
                     <li>
                         <h2 class="text-xl font-semibold mt-6 pt-3 border-t border-gray-600 text-white">Data & Analytics</h2>
                         <ul class="ml-4 space-y-1 mt-2">
-                            <li><a href="#upload-etl" class="sidebar-link block py-1 px-2 rounded">POST /data/upload-data/{id}</a></li>
-                            <li><a href="#log-single-reading" class="sidebar-link block py-1 px-2 rounded">POST /data/sensor-reading/{id}</a></li>
-                            <li><a href="#get-sensor-metrics" class="sidebar-link block py-1 px-2 rounded">GET /data/sensor-metrics/{id}</a></li>
+                            <li><a href="#upload-etl" class="sidebar-link block py-1 px-2 rounded">POST /data/upload/{id}</a></li>
+                            <li><a href="#log-single-reading" class="sidebar-link block py-1 px-2 rounded">POST /data/reading/{id}</a></li>
+                            <li><a href="#get-sensor-metrics" class="sidebar-link block py-1 px-2 rounded">GET /data/metrics/{id}</a></li>
                             <li><a href="#get-health-summary" class="sidebar-link block py-1 px-2 rounded">GET /data/health-summary</a></li>
-                            <li><a href="#get-analytics-report" class="sidebar-link block py-1 px-2 rounded">POST /data/analytics-report</a></li>
-                            <li><a href="#log-anomaly" class="sidebar-link block py-1 px-2 rounded">POST /data/anomaly-alerts</a></li>
-                            <li><a href="#get-anomalies" class="sidebar-link block py-1 px-2 rounded">GET /data/anomaly-alerts</a></li>
+                            <li><a href="#get-analytics-report" class="sidebar-link block py-1 px-2 rounded">POST /data/report</a></li>
+                            <li><a href="#log-anomaly" class="sidebar-link block py-1 px-2 rounded">POST /data/anomalies</a></li>
+                            <li><a href="#get-anomalies" class="sidebar-link block py-1 px-2 rounded">GET /data/anomalies</a></li>
                         </ul>
                     </li>
                 </ul>
             </nav>
         </aside>
 
-        <!-- Main Content -->
         <main class="w-3/4 ml-[25%] p-10 content-container">
             
             <section id="introduction" class="content-section mb-12">
                 <h1 class="text-4xl font-bold border-b pb-2 mb-4">Smart Turbine Health Analytics API</h1>
-                <p class="text-lg">This document provides a complete technical guide for the API, designed for managing turbine metadata and analyzing sensor telemetry data from naval propulsion plants. It covers all available endpoints, data models, and the methodologies behind the analytical calculations.</p>
+                <p class="text-lg mb-4">This document provides a complete technical guide for the Smart Turbine Health Analytics API, a system designed for the management and analysis of sensor telemetry data from naval vessel Gas Turbine (GT) propulsion plants. It covers all available endpoints, data models, and the detailed thermodynamic and physical methodologies behind the analytical calculations.</p>
+                <p class="text-lg">The primary goal of this API is to facilitate Condition-Based Maintenance (CBM) for mission-critical naval assets. By tracking performance decay and identifying anomalies in real-time, the system enables proactive maintenance, enhancing vessel readiness, reducing operational costs, and preventing catastrophic failures. </p>
                 <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p><strong class="font-semibold">Base URL:</strong> <code class="bg-gray-200 px-2 py-1 rounded">http://127.0.0.1:8000</code></p>
+                    <p><strong class="font-semibold">Base URL:</strong> <code class="bg-gray-200 px-2 py-1 rounded">https://api.navalturbineanalytics.com/v5</code></p>
                     <p><strong class="font-semibold">API Version:</strong> 5.0.0</p>
+                </div>
+            </section>
+
+            <section id="authentication" class="content-section mb-12">
+                <h1 class="text-3xl font-bold border-b pb-2 mb-4">Authentication</h1>
+                <p class="text-lg mb-4">All requests to the API must be authenticated using a Bearer Token. You must include an <code class="bg-gray-200 px-2 py-1 rounded">Authorization</code> header with your API key.</p>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-semibold mb-2">Example Header</h3>
+                    <pre class="code-block"><code>Authorization: Bearer YOUR_API_KEY_HERE</code></pre>
                 </div>
             </section>
 
             <section id="analytics-deep-dive" class="content-section mb-12">
                 <h1 class="text-3xl font-bold border-b pb-2 mb-4">Analytics & Formulas Deep Dive</h1>
-                <p class="mb-6">Derived features are the most powerful aspect of this API. They are not measured by a single sensor but are calculated by combining multiple sensor inputs to provide a deeper insight into the engine's thermodynamic condition.</p>
-                
+                <p class="mb-6 text-lg">Derived features are the most powerful aspect of this API. They are not measured by a single sensor but are calculated by combining multiple sensor inputs to provide a deeper insight into the engine's thermodynamic condition, performance, and overall health. 
+
+[Image of gas turbine schematic]
+</p>
+
+                <h2 class="text-2xl font-bold mb-4 mt-6">Core Thermodynamic Indicators</h2>
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <h3 class="text-2xl font-semibold mb-2">Pressure Ratio (πₚ)</h3>
-                    <p class="mb-2">The fundamental measure of the compressor's work. It quantifies how much the air pressure is increased from the inlet to the outlet.</p>
+                    <h3 class="text-xl font-semibold mb-2">Pressure Ratio (πₚ)</h3>
+                    <p class="mb-2"><strong>What it is:</strong> The fundamental measure of the compressor's work. It quantifies how much the air pressure is increased from the inlet to the outlet.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> A higher pressure ratio is directly linked to higher engine efficiency and power output. A drop in this value at a given speed can indicate compressor fouling (e.g., from salt spray ingestion) or physical damage to the blades.</p>
+                    <p class="mb-2"><strong>Real World Example:</strong> At a flank speed of 27 knots, a healthy GT compressor might achieve a pressure ratio of 12:1. If, after months of operation, this drops to 10.5:1 under the same conditions, it signifies a significant performance loss, likely requiring a compressor wash to restore efficiency.</p>
                     <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
                     <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Pressure&space;Ratio&space;}=&space;\frac{P_2}{P_1}" class="formula-img" alt="Pressure Ratio Formula"/>
                     <ul class="list-disc list-inside mt-2 text-md">
@@ -85,8 +101,9 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <h3 class="text-2xl font-semibold mb-2">Thermal Efficiency (ηₜₕ)</h3>
-                    <p class="mb-2">A theoretical measure of how efficiently the turbine converts fuel's heat energy into useful work, based on the ideal Brayton Cycle.</p>
+                    <h3 class="text-xl font-semibold mb-2">Thermal Efficiency (ηₜₕ)</h3>
+                    <p class="mb-2"><strong>What it is:</strong> A theoretical measure of how efficiently the turbine converts fuel's heat energy into useful work, based on the ideal Brayton Cycle.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> It provides a benchmark for engine performance. While the actual efficiency will be lower due to real-world losses (friction, heat loss), tracking the trend of this ideal metric is crucial. As the pressure ratio drops due to degradation, the ideal thermal efficiency will also decrease, indicating the engine's maximum potential is diminishing.</p>
                     <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
                     <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\eta_{th}&space;(\%)&space;=&space;\left(&space;1&space;-&space;\frac{1}{\pi_p^{(\gamma-1)/\gamma}}&space;\right)&space;\times&space;100" class="formula-img" alt="Thermal Efficiency Formula"/>
                     <ul class="list-disc list-inside mt-2 text-md">
@@ -95,9 +112,10 @@
                     </ul>
                 </div>
                 
-                <div class="bg-white p-6 rounded-lg shadow-md">
-                    <h3 class="text-2xl font-semibold mb-2">Compressor Isentropic Efficiency (η꜀)</h3>
-                    <p class="mb-2">The most direct indicator of the compressor's health. It compares the actual energy used to compress air with the ideal (frictionless) energy required.</p>
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Compressor Isentropic Efficiency (η꜀)</h3>
+                    <p class="mb-2"><strong>What it is:</strong> The most direct indicator of the compressor's health. It compares the actual energy (measured by temperature rise) used to compress air with the ideal (frictionless, adiabatic) energy required.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> A drop in compressor efficiency means more energy is being wasted as heat, indicating problems like blade fouling or erosion. The compressor blades are tiny airfoils; salt, dust, and grime disrupt their aerodynamic shape, causing turbulence and friction. This wasted energy manifests as excess heat, which this formula precisely detects. A 2% drop here can directly correlate to a ~2% increase in fuel consumption. </p>
                     <h4 class="font-semibold text-lg mb-1">Calculation (Two Steps):</h4>
                     <ol class="list-decimal list-inside">
                         <li class="mb-4">First, calculate the Ideal Outlet Temperature (T₂ₛ):
@@ -106,7 +124,7 @@
                         <li>Then, calculate the efficiency by comparing the ideal temperature rise to the actual rise:
                             <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\eta_c&space;(\%)&space;=&space;\left(&space;\frac{T_{2s}&space;-&space;T_1}{T_2&space;-&space;T_1}&space;\right)&space;\times&space;100" class="formula-img" alt="Compressor Efficiency Formula"/>
                         </li>
-                    </ul>
+                    </ol>
                     <ul class="list-disc list-inside mt-2 text-md">
                         <li><strong>T₁</strong>: Actual Compressor Inlet Temperature (from sensor `t1`).</li>
                         <li><strong>T₂</strong>: Actual Compressor Outlet Temperature (from sensor `t2`).</li>
@@ -114,118 +132,160 @@
                         <li><strong>Note:</strong> All temperatures are converted to Kelvin (°C + 273.15) for calculations.</li>
                     </ul>
                 </div>
+
+                <h2 class="text-2xl font-bold mb-4 mt-8">Performance & Power Metrics</h2>
+
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Power Proxy (kW)</h3>
+                    <p class="mb-2"><strong>What it is:</strong> An estimation of the power output of the gas turbine in kilowatts.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> This is a direct measure of the useful work being done by the turbine shaft. It's essential for understanding the engine's performance under different load conditions (e.g., cruising vs. full speed) and for tracking power degradation. If the engine requires more fuel (mf) to produce the same power, it's a clear sign of decreased overall efficiency.</p>
+                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Power&space;(kW)}&space;=&space;\text{GTT&space;[kN m]}&space;\times&space;\text{GTn&space;[rpm]}&space;\times&space;\frac{2\pi}{60}" class="formula-img" alt="Power Proxy Formula"/>
+                    <ul class="list-disc list-inside mt-2 text-md">
+                        <li><strong>GTT</strong>: Gas Turbine Shaft Torque (kN m).</li>
+                        <li><strong>GTn</strong>: Gas Turbine Revolutions (rpm).</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Specific Fuel Consumption (SFC)</h3>
+                    <p class="mb-2"><strong>What it is:</strong> A crucial measure of engine efficiency, indicating how much fuel is consumed to produce a unit of power.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> This is a bottom-line metric for performance. A lower SFC means better fuel efficiency. For a naval vessel, this translates directly to longer range and lower operational costs. An increasing SFC over time is a definitive indicator of engine health degradation.</p>
+                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{SFC&space;[kg/s/kW]}&space;=&space;\frac{\text{Fuel&space;Flow&space;(mf)}}{\text{Power&space;(kW)}}" class="formula-img" alt="Specific Fuel Consumption Formula"/>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Total Propeller Torque</h3>
+                    <p class="mb-2"><strong>What it is:</strong> The combined torque being applied to both the starboard and port propellers.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> This value represents the total rotational force being translated into thrust to move the vessel. It's a key indicator of the total load on the propulsion system. Higher speeds or maneuvers require higher total torque.</p>
+                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Total&space;Torque}&space;=&space;T_s&space;+&space;T_p" class="formula-img" alt="Total Propeller Torque Formula"/>
+                    <ul class="list-disc list-inside mt-2 text-md">
+                        <li><strong>Tₛ</strong>: Starboard Propeller Torque (kN).</li>
+                        <li><strong>Tₚ</strong>: Port Propeller Torque (kN).</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Torque Differential</h3>
+                    <p class="mb-2"><strong>What it is:</strong> The absolute difference in torque between the starboard and port propellers.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> In ideal straight-line operation, this value should be near zero. A significant, sustained differential can indicate an imbalance in the power transmission, a problem with one of the propeller shafts, or uneven hull fouling (e.g., more marine growth on one side of the ship).</p>
+                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Torque&space;Difference}&space;=&space;|T_s&space;-&space;T_p|" class="formula-img" alt="Torque Differential Formula"/>
+                </div>
+
+                <h2 class="text-2xl font-bold mb-4 mt-8">Health & Degradation Metrics</h2>
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Total Decay Score</h3>
+                    <p class="mb-2"><strong>What it is:</strong> A consolidated health score that combines the degradation of both the compressor and the turbine.</p>
+                    <p class="mb-2"><strong>Why it matters:</strong> This single number provides a quick, high-level assessment of the engine's overall wear and tear. A higher score signifies greater overall decay and a more urgent need for inspection or maintenance. It is a key input for the CBM decision-making process.</p>
+                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Decay&space;Score}&space;=&space;(1&space;-&space;kMc)&space;+&space;(1&space;-&space;kMt)" class="formula-img" alt="Total Decay Score Formula"/>
+                    <ul class="list-disc list-inside mt-2 text-md">
+                        <li><strong>kMc</strong>: Compressor Decay Coefficient.</li>
+                        <li><strong>kMt</strong>: Turbine Decay Coefficient.</li>
+                    </ul>
+                </div>
             </section>
 
-             <section id="etl-pipeline" class="content-section mb-12">
+            <section id="etl-pipeline" class="content-section mb-12">
                 <h1 class="text-3xl font-bold border-b pb-2 mb-4">ETL Pipeline & Anomaly Detection</h1>
-                <p class="mb-6 text-lg">This section details the automated **Extract, Transform, Load (ETL)** pipeline triggered by the <strong>POST /data/upload-data/{turbine_id}</strong> endpoint. This pipeline is crucial for converting raw, potentially unreliable sensor data into a clean, analysis-ready format and for automatically detecting operational anomalies.</p>
+                <p class="mb-6 text-lg">This section details the automated **Extract, Transform, Load (ETL)** pipeline triggered by the <strong>POST /data/upload/{turbine_id}</strong> endpoint. This pipeline is crucial for converting raw, potentially unreliable sensor data into a clean, analysis-ready format and for automatically detecting operational anomalies. </p>
                 
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-2xl font-semibold mb-2">Step 1: Extract (E)</h3>
-                    <p class="mb-2">The process begins by extracting data from the uploaded CSV file. The API validates the file type and parses the content into a structured DataFrame, which is an in-memory table.</p>
-                    <ul class="list-disc list-inside mt-2 text-md space-y-1">
-                        <li><strong>Action:</strong> Reads the uploaded `.csv` file.</li>
-                        <li><strong>Why:</strong> To convert the raw text data into a structured format that can be programmatically manipulated.</li>
-                        <li><strong>Validation:</strong> Ensures the file has a `.csv` extension and that all required sensor columns are present.</li>
-                    </ul>
+                    <p class="mb-2">The process begins by extracting data from the uploaded CSV file. The API validates the file type and parses the content into a structured DataFrame.</p>
                 </div>
 
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-2xl font-semibold mb-2">Step 2: Transform (T)</h3>
                     <p class="mb-2">This is the core data processing stage, involving several sub-steps to clean and enrich the data.</p>
                     <div class="mt-4">
-                        <h4 class="font-semibold text-lg mb-1">A. Column Renaming</h4>
-                        <p>The original CSV headers are verbose (e.g., "HP Turbine exit temperature (T48) [°C]"). They are renamed to simple, standardized names (e.g., "t48").</p>
-                        <p class="font-semibold mt-1">Why?</p>
-                        <ul class="list-disc list-inside text-md">
-                            <li><strong>Consistency:</strong> Ensures predictable column names for all downstream calculations and database storage.</li>
-                            <li><strong>Simplicity:</strong> Makes coding and querying far easier and less error-prone.</li>
-                        </ul>
-                    </div>
-                    <div class="mt-4">
-                        <h4 class="font-semibold text-lg mb-1">B. Outlier Mitigation (IQR Capping)</h4>
-                        <p>Sensor data can contain erroneous spikes due to electrical interference or sensor malfunction. This pipeline identifies and corrects these outliers using the Interquartile Range (IQR) method.</p>
-                        <p class="font-semibold mt-1">Why not just delete outliers?</p>
-                        <ul class="list-disc list-inside text-md">
-                            <li>In time-series data, each point is part of a sequence. Removing a point creates a gap and distorts time-based calculations like moving averages. Capping (or flooring) brings the value back to a plausible maximum (or minimum) without breaking the sequence.</li>
-                        </ul>
-                        <h4 class="font-semibold text-lg mt-2 mb-1">How it Works:</h4>
-                         <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{IQR}&space;=&space;Q3&space;-&space;Q1" class="formula-img" alt="IQR Formula"/>
-                         <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Upper&space;Bound}&space;=&space;Q3&space;+&space;(1.5&space;*&space;IQR)" class="formula-img" alt="Upper Bound Formula"/>
-                         <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Lower&space;Bound}&space;=&space;Q1&space;-&space;(1.5&space;*&space;IQR)" class="formula-img" alt="Lower Bound Formula"/>
-                        <p>Any value above the Upper Bound is set *to* the Upper Bound. Any value below is set *to* the Lower Bound. 
+                        <h4 class="font-semibold text-lg mb-1">A. Outlier Mitigation (IQR Capping)</h4>
+                        <p>Sensor data can contain erroneous spikes. This pipeline identifies and corrects these outliers using the Interquartile Range (IQR) method. Any value outside 1.5 * IQR from the quartiles is capped at that limit, preserving the data point without skewing analysis.</p>
+                         <p class="mt-2"><strong>Example:</strong> A sensor glitch causes a single `T48` reading to be 2000°C, which is physically impossible. Instead of corrupting averages, IQR capping might bring this value down to a plausible maximum like 1100°C for that operational state.</p>
+                         
 
 [Image of Interquartile range boxplot]
-</p>
+
                     </div>
-                     <div class="mt-4">
-                        <h4 class="font-semibold text-lg mb-1">C. Noise Reduction (Smoothing)</h4>
-                        <p>Raw sensor data is often "noisy." A 3-point moving average is applied to smooth out these random fluctuations.</p>
-                        <p class="font-semibold mt-1">Why?</p>
-                        <ul class="list-disc list-inside text-md">
-                            <li>This filtering reveals the true underlying trend in the data, making it easier for both humans and algorithms to spot meaningful changes rather than reacting to insignificant noise.</li>
-                        </ul>
+                    <div class="mt-4">
+                        <h4 class="font-semibold text-lg mb-1">B. Noise Reduction (Smoothing)</h4>
+                        <p>A 3-point moving average is applied to smooth out random fluctuations and reveal the true underlying trend in the sensor data.</p>
+                    </div>
+                    <div class="mt-4">
+                        <h4 class="font-semibold text-lg mb-1">C. Feature Engineering</h4>
+                        <p>This is where the raw data is enriched. All the metrics described in the <a href="#analytics-deep-dive" class="text-blue-600 hover:underline">Analytics Deep Dive</a> section (Pressure Ratio, Efficiencies, Power Proxy, Decay Score, etc.) are calculated for each row of data.</p>
                     </div>
                 </div>
 
-                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-2xl font-semibold mb-2">Step 3: Automated Anomaly Detection</h3>
-                    <p class="mb-2">After cleaning, each row of data is checked against a set of predefined operational thresholds. If a value exceeds a threshold, an anomaly is automatically logged in the `anomaly_alerts` table.</p>
+                    <p class="mb-2">After cleaning, each data point is checked against predefined operational thresholds. If a value exceeds a threshold, an anomaly is automatically logged.</p>
                     <h4 class="font-semibold text-lg mt-2 mb-1">Thresholds & Significance:</h4>
                     <div class="mt-2 p-4 bg-red-50 border border-red-200 rounded">
                         <p><strong class="font-semibold text-red-700">High Severity: Critical Turbine Exit Temperature</strong></p>
-                        <p><strong>Threshold:</strong> `t48 > 950` °C</p>
-                        <p><strong>Meaning:</strong> This is a critical alert. The turbine's hot section is under extreme thermal stress. Sustained operation above this limit can lead to rapid material degradation, blade damage, and potentially catastrophic engine failure.</p>
+                        <p><strong>Threshold:</strong> `t48 > 1050` °C</p>
+                        <p><strong>Meaning:</strong> This is a critical alert. The turbine's hot section is under extreme thermal stress, which can lead to rapid material degradation (creep) and potentially catastrophic engine failure.</p>
                     </div>
                     <div class="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                        <p><strong class="font-semibold text-yellow-700">Medium Severity: Component Decay</strong></p>
-                        <p><strong>Threshold:</strong> `decay_coeff_turbine < 0.96` or `decay_coeff_comp < 0.96`</p>
-                        <p><strong>Meaning:</strong> These coefficients represent the health of the turbine and compressor relative to a new component (1.0 = perfect health). A value below 0.96 indicates a significant loss of performance due to factors like fouling, erosion, or wear. This is a strong signal for upcoming maintenance.</p>
+                        <p><strong class="font-semibold text-yellow-700">Medium Severity: Significant Component Decay</strong></p>
+                        <p><strong>Threshold:</strong> `kMt < 0.975` or `kMc < 0.95`</p>
+                        <p><strong>Meaning:</strong> The core components have degraded beyond an acceptable performance threshold. This is a strong signal that maintenance is required to prevent further efficiency loss and potential damage.</p>
                     </div>
                      <div class="mt-2 p-4 bg-blue-50 border border-blue-200 rounded">
-                        <p><strong class="font-semibold text-blue-700">Low Severity: Low Pressure Ratio at Speed</strong></p>
-                        <p><strong>Threshold:</strong> `pressure_ratio < 9.0` (only when `gtn > 1500` RPM)</p>
-                        <p><strong>Meaning:</strong> When the turbine is running at speed, the compressor should be generating a high pressure ratio. If it fails to do so, it indicates inefficiency. This is often the earliest, most subtle sign of compressor fouling before it impacts other parameters.</p>
+                        <p><strong class="font-semibold text-blue-700">Low Severity: High Torque Differential</strong></p>
+                        <p><strong>Threshold:</strong> `Torque Differential > 5.0` (when `Ship Speed > 10 knots`)</p>
+                        <p><strong>Meaning:</strong> The propulsion system is unbalanced during steady cruising. This warrants investigation for potential hull fouling or propeller issues before it becomes a more serious problem affecting fuel efficiency and maneuverability.</p>
                     </div>
                 </div>
 
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-2xl font-semibold mb-2">Step 4: Load (L)</h3>
-                    <p class="mb-2">Finally, the cleaned, transformed, and analyzed data is loaded into the `sensor_readings` database table for the specified turbine.</p>
-                     <ul class="list-disc list-inside mt-2 text-md space-y-1">
-                        <li><strong>Action:</strong> Appends the processed DataFrame to the SQL table.</li>
-                        <li><strong>Why:</strong> This persists the high-quality data, making it available for fast and efficient querying by all other API endpoints.</li>
-                    </ul>
+                    <p class="mb-2">Finally, the cleaned, transformed, and enriched data is loaded into the database, making it available for fast querying by all other API endpoints.</p>
                 </div>
-
             </section>
             
-            <h1 class="text-3xl font-bold border-b pb-2 mb-8 mt-12">Turbine Management</h1>
+            <h1 class="text-3xl font-bold border-b pb-2 mb-8 mt-12">Turbine Management Endpoints</h1>
             
             <section id="create-turbine" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/turbines</h2>
-                <p class="mb-4">Creates a new turbine record in the `turbine_metadata` table. This is the first step before uploading sensor data for a new turbine.</p>
+                <p class="mb-4">Creates a new turbine record. This is the first step before uploading sensor data for a new asset.</p>
                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
-                <pre class="bg-gray-100 p-4 rounded-md text-sm"><code>{
-  "location": "North Sea Platform Alpha",
-  "manufacturer": "Siemens",
-  "model": "SGT-400"
+                <pre class="code-block"><code>{
+  "location": "Frigate F-101, Starboard Engine",
+  "manufacturer": "Rolls-Royce",
+  "model": "MT30",
+  "install_date": "2022-08-20"
 }</code></pre>
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>201 Created:</strong></p>
-                <pre class="bg-green-100 text-green-800 p-4 rounded-md text-sm"><code>{
-  "location": "North Sea Platform Alpha", "manufacturer": "Siemens", "model": "SGT-400", "turbine_id": 4
+                <pre class="code-block"><code>{
+  "turbine_id": 5,
+  "location": "Frigate F-101, Starboard Engine",
+  "manufacturer": "Rolls-Royce",
+  "model": "MT30",
+  "install_date": "2022-08-20"
 }</code></pre>
             </section>
             
             <section id="get-all-turbines" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/turbines</h2>
-                <p class="mb-4">Retrieves a list of all turbines registered in the `turbine_metadata` table.</p>
+                <p class="mb-4">Retrieves a list of all turbines registered in the system.</p>
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
-                <pre class="bg-green-100 text-green-800 p-4 rounded-md text-sm"><code>[
-  { "location": "Singapore Port", "manufacturer": "GE", "model": "GTX-1000", "turbine_id": 1 },
-  { "location": "Singapore Port", "manufacturer": "Siemens", "model": "ST-2000", "turbine_id": 2 }
+                <pre class="code-block"><code>[
+  {
+    "turbine_id": 1,
+    "location": "Frigate F-99, Port Engine",
+    "model": "LM2500"
+  },
+  {
+    "turbine_id": 2,
+    "location": "Frigate F-99, Starboard Engine",
+    "model": "LM2500"
+  }
 ]</code></pre>
             </section>
 
@@ -234,57 +294,137 @@
                 <p class="mb-4">Retrieves the detailed metadata for a single turbine identified by its ID.</p>
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
-                <pre class="bg-green-100 text-green-800 p-4 rounded-md text-sm"><code>{
-  "location": "Singapore Port", "manufacturer": "GE", "model": "GTX-1000", "turbine_id": 1
+                <pre class="code-block"><code>{
+  "turbine_id": 1,
+  "location": "Frigate F-99, Port Engine",
+  "manufacturer": "General Electric",
+  "model": "LM2500",
+  "install_date": "2020-01-15",
+  "last_maintenance": "2023-05-10"
 }</code></pre>
+                 <p class="mt-2"><strong>404 Not Found:</strong></p>
+                <pre class="code-block"><code>{ "detail": "Turbine with ID 999 not found" }</code></pre>
             </section>
 
             <section id="update-turbine" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-put text-sm font-mono px-2 py-1 rounded-md mr-3">PUT</span>/turbines/{turbine_id}</h2>
-                <p class="mb-4">Updates the metadata for an existing turbine.</p>
-                <h3 class="text-xl font-semibold mt-4 mb-2">Request Body</h3>
-                <pre class="bg-gray-100 p-4 rounded-md text-sm"><code>{ "location": "Atlantic Relay Station", "manufacturer": "General Electric", "model": "GTX-1000 Rev.2" }</code></pre>
+                <p class="mb-4">Updates the metadata for an existing turbine, such as logging a new maintenance date.</p>
+                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
+                <pre class="code-block"><code>{
+  "last_maintenance": "2024-01-20"
+}</code></pre>
+                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>200 OK:</strong></p>
+                <pre class="code-block"><code>{
+  "turbine_id": 1,
+  "location": "Frigate F-99, Port Engine",
+  ...
+  "last_maintenance": "2024-01-20"
+}</code></pre>
             </section>
             
-            <h1 class="text-3xl font-bold border-b pb-2 mb-8 mt-12">Data & Analytics</h1>
+            <h1 class="text-3xl font-bold border-b pb-2 mb-8 mt-12">Data & Analytics Endpoints</h1>
 
             <section id="upload-etl" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/upload-data/{turbine_id}</h2>
-                <p class="mb-4">Performs a full ETL pipeline on a batch of sensor data from a CSV file. It cleans, processes, and loads the data into the database for the specified turbine. See the ETL & Anomaly Detection section for a full breakdown.</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/upload/{turbine_id}</h2>
+                <p class="mb-4">Performs a full ETL pipeline on a batch of sensor data from a CSV file. See the <a href="#etl-pipeline" class="text-blue-600 hover:underline">ETL & Anomaly Detection</a> section for a full breakdown. Request body should be `multipart/form-data` with a file.</p>
+                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>200 OK:</strong></p>
+                <pre class="code-block"><code>{ 
+  "message": "Successfully processed 11904 records for turbine 1.",
+  "anomalies_detected": 42
+}</code></pre>
             </section>
             
             <section id="log-single-reading" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/sensor-reading/{turbine_id}</h2>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/reading/{turbine_id}</h2>
                 <p class="mb-4">Logs a single, real-time sensor reading and automatically checks it against thresholds to log anomalies.</p>
+                <h3 class="text-xl font-semibold mb-2">Request Body</h3>
+                <pre class="code-block"><code>{
+  "lp": 8.2, "v": 20.1, "gtt": 21000.5, "gtn": 1850.2, "ggn": 7900.8,
+  "ts": 190.1, "tp": 192.3, "t48": 980.7, "t1": 25.0, "t2": 550.1,
+  "p48": 4.3, "p1": 0.98, "p2": 10.5, "pexh": 1.02, "tic": 85.5,
+  "mf": 4.1, "kMc": 0.98, "kMt": 0.99
+}</code></pre>
             </section>
             
             <section id="get-sensor-metrics" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/sensor-metrics/{turbine_id}</h2>
-                <p class="mb-4">Retrieves the most recent sensor readings for a turbine, ideal for real-time dashboards.</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/metrics/{turbine_id}</h2>
+                <p class="mb-4">Retrieves recent sensor readings for a turbine, ideal for real-time dashboards. Supports pagination.</p>
             </section>
             
             <section id="get-health-summary" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/health-summary</h2>
-                <p class="mb-4">Provides a high-level, lifetime-to-date scorecard for each turbine, including calculated performance and efficiency metrics.</p>
+                <p class="mb-4">Provides a high-level, lifetime-to-date scorecard for each turbine, including the average of all calculated performance and efficiency metrics.</p>
+                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>200 OK:</strong></p>
+                <pre class="code-block"><code>[
+  {
+    "turbine_id": 1,
+    "location": "Frigate F-99, Port Engine",
+    "lifetime_avg_isentropic_efficiency": 88.5,
+    "lifetime_avg_sfc": 0.21,
+    "current_compressor_decay": 0.97,
+    "current_turbine_decay": 0.98,
+    "total_anomalies": 152
+  }
+]</code></pre>
             </section>
             
             <section id="get-analytics-report" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/analytics-report</h2>
-                <p class="mb-4">Returns a detailed statistical report (min, avg, max) for specified turbines over a date range. If dates are omitted, it analyzes the entire data history.</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/report</h2>
+                <p class="mb-4">Returns a detailed statistical report (min, avg, max, stddev) for every raw and derived metric. Filter by turbine IDs and/or a date range.</p>
+                <h3 class="text-xl font-semibold mb-2">Request Body</h3>
+                <pre class="code-block"><code>{
+  "turbine_ids": [1, 2],
+  "start_date": "2023-10-01",
+  "end_date": "2023-10-31"
+}</code></pre>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>200 OK:</strong></p>
+                 <pre class="code-block"><code>{
+  "report_period": "2023-10-01 to 2023-10-31",
+  "turbines_analyzed": [1, 2],
+  "metrics": {
+    "pressure_ratio": { "min": 3.1, "avg": 9.8, "max": 12.5, "stddev": 1.2 },
+    "comp_isentropic_efficiency": { "min": 85.2, "avg": 88.1, "max": 90.3, "stddev": 0.8 },
+    "power_proxy_kw": { "min": 5000, "avg": 18500, "max": 25000, "stddev": 3500 }
+  }
+}</code></pre>
             </section>
             
             <section id="log-anomaly" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/anomaly-alerts</h2>
-                <p class="mb-4">Manually logs a new anomaly alert.</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/anomalies</h2>
+                <p class="mb-4">Manually logs a new anomaly alert, for events observed outside of automated detection (e.g., unusual noise reported by crew).</p>
+                <h3 class="text-xl font-semibold mb-2">Request Body</h3>
+                <pre class="code-block"><code>{
+  "turbine_id": 2,
+  "severity": "Medium",
+  "description": "Crew reported high-frequency vibration during maneuvering.",
+  "timestamp": "2024-02-15T14:30:00Z"
+}</code></pre>
             </section>
             
              <section id="get-anomalies" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/anomaly-alerts</h2>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/anomalies</h2>
                 <p class="mb-4">Retrieves a list of logged anomaly alerts, with optional filters for `turbine_id` and a date range.</p>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>200 OK:</strong></p>
+                <pre class="code-block"><code>[
+  {
+    "anomaly_id": 101,
+    "turbine_id": 1,
+    "timestamp": "2023-11-05T10:20:00Z",
+    "severity": "High",
+    "metric": "t48",
+    "value": 1055.2,
+    "threshold": 1050.0,
+    "description": "Critical Turbine Exit Temperature exceeded threshold."
+  }
+]</code></pre>
             </section>
 
         </main>
     </div>
 </body>
 </html>
-
