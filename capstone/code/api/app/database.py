@@ -2,17 +2,10 @@ import sqlite3
 from sqlalchemy import create_engine
 from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DATABASE_PATH = BASE_DIR / "data" / "turbine_data.db"
 
-APP_DIR = Path(__file__).parent.resolve()
-
-PROJECT_ROOT = APP_DIR.parent
-
-DATA_DIR = PROJECT_ROOT / "data"
-DATABASE_PATH = DATA_DIR / "turbine_data.db"
-
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 

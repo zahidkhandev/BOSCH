@@ -1,4 +1,3 @@
-## models.py
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, timedelta, datetime
@@ -17,11 +16,10 @@ class TurbineUpdate(TurbineBase):
 
 class Turbine(TurbineBase):
     turbine_id: int
-    # Note: `from_attributes = True` on the Config class is the correct way to handle this
     class Config:
         from_attributes = True
 
-# Telemetry and Analytics Models
+# RESTORED MODEL: Contains only the fields stored in the database
 class TurbineReading(BaseModel):
     lp: float
     v: float
@@ -45,7 +43,6 @@ class TurbineReading(BaseModel):
     class Config:
         from_attributes = True
 
-# MODIFIED MODEL
 class HealthSummary(BaseModel):
     turbine_id: int
     record_count: int
@@ -91,8 +88,8 @@ class TurbineAnalyticsReport(BaseModel):
 
 class TimeFilterRequest(BaseModel):
     turbine_ids: List[int] = Field(default=[1])
-    start_date: date = Field(default_factory=lambda: date.today() - timedelta(days=30))
-    end_date: date = Field(default_factory=date.today)
+    start_date: Optional[date] = Field(default=None, description="Optional start date for the report period.")
+    end_date: Optional[date] = Field(default=None, description="Optional end date for the report period.")
 
 class AnomalyAlertBase(BaseModel):
     turbine_id: int = Field(default=1)
@@ -107,3 +104,27 @@ class AnomalyAlert(AnomalyAlertBase):
     id: int
     class Config:
         from_attributes = True
+
+class TurbineReadingBase(BaseModel):
+    timestamp: datetime = Field(default_factory=datetime.now)
+    lp: float
+    v: float
+    gtt: float
+    gtn: float
+    ggn: float
+    ts: float
+    tp: float
+    t48: float
+    t1: float
+    t2: float
+    p48: float
+    p1: float
+    p2: float
+    pexh: float
+    tic: float
+    mf: float
+    decay_coeff_comp: float
+    decay_coeff_turbine: float
+
+class TurbineReadingCreate(TurbineReadingBase):
+    pass

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from app import models
 from app.database import get_db, engine
 from datetime import date
+from sqlalchemy.sql import text as sql_text
 
 router = APIRouter(
     prefix="/data",
@@ -22,19 +23,13 @@ def get_sensor_metrics(turbine_id: int, limit: int = 10, db: sqlite3.Connection 
         raise HTTPException(status_code=404, detail=f"No sensor metrics found for turbine ID {turbine_id}.")
     return [dict(row) for row in readings]
 
-# REWRITTEN ENDPOINT
 @router.get("/health-summary", response_model=List[models.HealthSummary], summary="Get Enriched Health Summary for All Turbines (Phase 5)")
 def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
-    # This query fetches all data needed for the summary calculations.
-    query = """
-        SELECT turbine_id, mf, gtt, t48, p1, p2, t1, t2, decay_coeff_comp, decay_coeff_turbine 
-        FROM sensor_readings
-    """
+    query = "SELECT * FROM sensor_readings"
     df = pd.read_sql_query(query, db)
     if df.empty:
         raise HTTPException(status_code=404, detail="No health summary data found.")
 
-    # Calculate derived features
     gamma = 1.4
     k_to_c = 273.15
     df['pressure_ratio'] = df['p2'] / df['p1']
@@ -44,7 +39,6 @@ def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
     df['thermal_efficiency'] = (1 - (1 / (df['pressure_ratio']**((gamma - 1) / gamma)))) * 100
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-    # Group by turbine and aggregate
     summary_groups = df.groupby('turbine_id').agg(
         record_count=('mf', 'count'),
         total_fuel_usage=('mf', 'sum'),
@@ -57,90 +51,128 @@ def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
         avg_turbine_decay=('decay_coeff_turbine', 'mean')
     ).reset_index()
 
-    # Convert to list of Pydantic models
     return summary_groups.to_dict(orient='records')
 
-@router.post("/upload-data/{turbine_id}", status_code=status.HTTP_201_CREATED, summary="Upload, Process, and Store Sensor Data (ETL)")
+def log_anomaly(turbine_id: int, timestamp: str, description: str, severity: str):
+    """
+    Helper function to insert an anomaly into the database using a new connection from the engine,
+    making it safe to call from the async upload endpoint.
+    """
+    with engine.connect() as connection:
+        with connection.begin(): # Start a transaction
+            connection.execute(
+                sql_text("""
+                    INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) 
+                    VALUES (:turbine_id, :timestamp, :description, :severity)
+                """),
+                {
+                    "turbine_id": turbine_id, "timestamp": timestamp, 
+                    "description": description, "severity": severity
+                }
+            )
+
+@router.post("/upload-data/{turbine_id}", status_code=status.HTTP_201_CREATED, summary="Upload, Process, Store, and Analyze Data for Anomalies (ETL)")
 async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...)):
     """
-    This endpoint performs a full ETL (Extract, Transform, Load) pipeline on an uploaded CSV of sensor data.
+    This endpoint performs a full ETL pipeline on uploaded CSV data.
     
-    - **Extract**: Reads and validates the CSV data.
-    - **Transform**: Cleans data, removes outliers, applies smoothing, and calculates derived features.
-    - **Load**: Appends the fully processed data to the database for the specified turbine.
+    - **Extract**: Reads and validates the CSV.
+    - **Transform**: Cleans, smooths, and enriches the data.
+    - **Analyze & Alert**: Checks data against predefined thresholds and automatically logs anomalies.
+    - **Load**: Appends the cleaned sensor data to the database.
     """
-    # --- Database Check (using the thread-safe engine) ---
     with engine.connect() as connection:
         result = connection.execute(
-            sqlite3.text("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = :id"),
+            sql_text("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = :id"),
             {"id": turbine_id}
         )
         if result.scalar_one_or_none() is None:
             raise HTTPException(status_code=404, detail=f"Turbine with ID {turbine_id} not found.")
 
-    # --- 1. EXTRACT ---
     if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a CSV file.")
+        raise HTTPException(status_code=400, detail="Invalid file type.")
 
     try:
         contents = await file.read()
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
-        df.columns = df.columns.str.lower()
+        df.rename(columns=lambda x: x.lower().strip(), inplace=True)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read or parse CSV file: {e}")
 
-    required_cols = ['lp', 'v', 'gtt', 'gtn', 'ggn', 'ts', 'tp', 't48', 't1', 't2', 'p48', 'p1', 'p2', 'pexh', 'tic', 'mf', 'decay_coeff_comp', 'decay_coeff_turbine']
+    column_mapping = {
+        "lever position (lp)": "lp", "ship speed (v) [knots]": "v", "gas turbine shaft torque (gtt) [kn/m]": "gtt",
+        "gas turbine revolutions (gtn) [rpm]": "gtn", "gas generator revolutions (ggn) [rpm]": "ggn",
+        "starboard propeller torque (ts) [kn/m]": "ts", "port propeller torque (tp) [kn/m]": "tp",
+        "hp turbine exit temperature (t48) [°c]": "t48", "compressor inlet air temperature (t1) [°c]": "t1",
+        "compressor outlet air temperature (t2) [°c]": "t2", "hp turbine exit pressure (p48) [bar]": "p48",
+        "compressor inlet air pressure (p1) [bar]": "p1", "compressor outlet air pressure (p2) [bar]": "p2",
+        "exhaust gas pressure [bar]": "pexh", "turbine injection control (tic) [%]": "tic",
+        "fuel flow (mf) [kg/s]": "mf", "compressor decay coefficient": "decay_coeff_comp",
+        "turbine decay coefficient": "decay_coeff_turbine"
+    }
+    df.rename(columns=column_mapping, inplace=True)
+    
+    required_cols = list(column_mapping.values())
     if not all(col in df.columns for col in required_cols):
         missing_cols = [col for col in required_cols if col not in df.columns]
         raise HTTPException(status_code=400, detail=f"CSV is missing required columns: {missing_cols}")
 
-    # --- 2. TRANSFORM ---
+    # --- TRANSFORM ---
     df.drop_duplicates(inplace=True)
     for col in required_cols:
         if df[col].isnull().any():
             df[col].fillna(df[col].median(), inplace=True)
 
-    numeric_cols = df.select_dtypes(include=np.number).columns
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+    if 'index' in numeric_cols: numeric_cols.remove('index')
+    
     for col in numeric_cols:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
+        Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
         IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
+        lower_bound, upper_bound = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
         df[col] = df[col].clip(lower_bound, upper_bound)
         
     df[numeric_cols] = df[numeric_cols].rolling(window=3, min_periods=1).mean()
-
-    gamma = 1.4
-    k_to_c = 273.15
     df['pressure_ratio'] = df['p2'] / df['p1']
-    t1_k, t2_k = df['t1'] + k_to_c, df['t2'] + k_to_c
-    t2s_k = t1_k * (df['pressure_ratio']**((gamma - 1) / gamma))
-    df['compressor_efficiency'] = ((t2s_k - t1_k) / (t2_k - t1_k)) * 100
-    df['thermal_efficiency'] = (1 - (1 / (df['pressure_ratio']**((gamma - 1) / gamma)))) * 100
-    df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df.fillna(0, inplace=True)
+    
+    # --- ANALYZE & ALERT ---
+    alerts_found = []
+    # Add a temporary timestamp if not present for anomaly checking
+    if 'timestamp' not in df.columns:
+        df['timestamp'] = pd.to_datetime(pd.Timestamp.now()).strftime('%Y-%m-%d %H:%M:%S')
 
-    angular_velocity_rad_s = df['gtn'] * (2 * np.pi / 60)
-    df['power_proxy_kw'] = df['gtt'] * angular_velocity_rad_s
-    df['total_decay_score'] = (1 - df['decay_coeff_comp']) + (1 - df['decay_coeff_turbine'])
-    df['torque_diff'] = df['ts'] - df['tp']
-    df['rpm_ratio_gtn_ggn'] = df['gtn'] / df['ggn']
-    df['fuel_per_rpm'] = df['mf'] / df['gtn']
-    df['total_prop_torque'] = df['ts'] + df['tp']
+    for index, row in df.iterrows():
+        if row['t48'] > 950:
+            desc = f"Critical Turbine Exit Temperature: {row['t48']:.2f} °C"
+            log_anomaly(turbine_id, row['timestamp'], desc, "High")
+            alerts_found.append(desc)
+        if row['decay_coeff_turbine'] < 0.96:
+            desc = f"Medium Turbine Decay Detected: {row['decay_coeff_turbine']:.4f}"
+            log_anomaly(turbine_id, row['timestamp'], desc, "Medium")
+            alerts_found.append(desc)
+        if row['decay_coeff_comp'] < 0.96:
+            desc = f"Medium Compressor Decay Detected: {row['decay_coeff_comp']:.4f}"
+            log_anomaly(turbine_id, row['timestamp'], desc, "Medium")
+            alerts_found.append(desc)
+        if row['pressure_ratio'] < 9.0 and row['gtn'] > 1500: # Check only when running at speed
+            desc = f"Low Pressure Ratio at Speed: {row['pressure_ratio']:.2f}"
+            log_anomaly(turbine_id, row['timestamp'], desc, "Low")
+            alerts_found.append(desc)
 
+    # --- LOAD ---
     df = df.round(4)
     df['turbine_id'] = turbine_id
-
-    # --- 3. LOAD ---
     load_df = df[required_cols + ['turbine_id']]
     
     try:
-        # Use the thread-safe engine for the database write operation
         load_df.to_sql('sensor_readings', con=engine, if_exists='append', index=False)
-        return {"message": f"Successfully processed and loaded {len(load_df)} records for turbine ID {turbine_id}."}
+        response_message = f"Successfully processed and loaded {len(load_df)} records for turbine ID {turbine_id}."
+        if alerts_found:
+            response_message += f" Found and logged {len(alerts_found)} anomalies."
+        return {"message": response_message, "anomalies_logged": alerts_found}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load data into database: {e}")
+
 
 @router.post("/anomaly-alerts", response_model=models.AnomalyAlert, status_code=status.HTTP_201_CREATED, summary="Log a New Anomaly Alert (Phase 5)")
 def log_anomaly_alert(alert: models.AnomalyAlertCreate, db: sqlite3.Connection = Depends(get_db)):
@@ -175,16 +207,22 @@ def get_anomaly_alerts(turbine_id: Optional[int] = None, start_date: Optional[da
 @router.post("/analytics-report", response_model=Dict[int, models.TurbineAnalyticsReport], summary="Get Advanced Analytics Report")
 def get_analytics_report(filters: models.TimeFilterRequest = Body(...), db: sqlite3.Connection = Depends(get_db)):
     placeholders = ','.join('?' for _ in filters.turbine_ids)
-    query = f"SELECT * FROM sensor_readings WHERE date(timestamp) BETWEEN ? AND ? AND turbine_id IN ({placeholders})"
-    params = [filters.start_date.isoformat(), filters.end_date.isoformat()] + filters.turbine_ids
+    
+    if filters.start_date and filters.end_date:
+        query = f"SELECT * FROM sensor_readings WHERE date(timestamp) BETWEEN ? AND ? AND turbine_id IN ({placeholders})"
+        params = [filters.start_date.isoformat(), filters.end_date.isoformat()] + filters.turbine_ids
+    else:
+        query = f"SELECT * FROM sensor_readings WHERE turbine_id IN ({placeholders})"
+        params = filters.turbine_ids
 
     df = pd.read_sql_query(query, db, params=params)
     if df.empty:
-        raise HTTPException(status_code=404, detail="No data for specified filters.")
+        raise HTTPException(status_code=404, detail="No data found for the specified filters.")
     
     reports = {turbine_id: calculate_analytics(group) for turbine_id, group in df.groupby('turbine_id')}
     return reports
 
+# MODIFIED FUNCTION
 def calculate_analytics(df: pd.DataFrame):
     df.columns = df.columns.str.lower()
     gamma = 1.4
@@ -197,12 +235,18 @@ def calculate_analytics(df: pd.DataFrame):
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     def get_stats(series):
+        # Fill NaN values before calculating stats to avoid errors
+        series.fillna(0, inplace=True)
         return models.Stats(min=series.min(), avg=series.mean(), max=series.max())
+
+    # Safely get min/max timestamps
+    start_time = df['timestamp'].min()
+    end_time = df['timestamp'].max()
 
     return models.TurbineAnalyticsReport(
         record_count=len(df),
-        period_start=df['timestamp'].min(),
-        period_end=df['timestamp'].max(),
+        period_start=str(start_time) if pd.notna(start_time) else "N/A",
+        period_end=str(end_time) if pd.notna(end_time) else "N/A",
         compressor_stats=models.CompressorStats(
             inlet_temp_t1=get_stats(df['t1']),
             outlet_temp_t2=get_stats(df['t2']),
@@ -222,3 +266,83 @@ def calculate_analytics(df: pd.DataFrame):
             compressor_efficiency_percent=get_stats(df['compressor_efficiency'])
         )
     )
+
+@router.post("/sensor-reading/{turbine_id}", response_model=models.TurbineReading, status_code=status.HTTP_201_CREATED, summary="Append a Single Sensor Reading and Check for Anomalies")
+def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreate, db: sqlite3.Connection = Depends(get_db)):
+    """
+    Logs a single sensor reading and automatically checks it against predefined
+    thresholds to log any anomalies in the same transaction.
+    """
+    cursor = db.cursor()
+    
+    # 1. Validate that the turbine_id exists
+    cursor.execute("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = ?", (turbine_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=404, detail=f"Turbine with ID {turbine_id} not found.")
+
+    # 2. Check for anomalies based on thresholds before inserting
+    
+    # Calculate pressure ratio for checking, handle potential division by zero
+    pressure_ratio = reading_data.p2 / reading_data.p1 if reading_data.p1 != 0 else 0
+    
+    # Check against thresholds and prepare any alerts
+    if reading_data.t48 > 950:
+        desc = f"Critical Turbine Exit Temperature: {reading_data.t48:.2f} °C"
+        cursor.execute(
+            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
+            (turbine_id, reading_data.timestamp.isoformat(), desc, "High")
+        )
+
+    if reading_data.decay_coeff_turbine < 0.96:
+        desc = f"Medium Turbine Decay Detected: {reading_data.decay_coeff_turbine:.4f}"
+        cursor.execute(
+            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
+            (turbine_id, reading_data.timestamp.isoformat(), desc, "Medium")
+        )
+
+    if reading_data.decay_coeff_comp < 0.96:
+        desc = f"Medium Compressor Decay Detected: {reading_data.decay_coeff_comp:.4f}"
+        cursor.execute(
+            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
+            (turbine_id, reading_data.timestamp.isoformat(), desc, "Medium")
+        )
+        
+    if pressure_ratio < 9.0 and reading_data.gtn > 1500: # Check only when running at speed
+        desc = f"Low Pressure Ratio at Speed: {pressure_ratio:.2f}"
+        cursor.execute(
+            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
+            (turbine_id, reading_data.timestamp.isoformat(), desc, "Low")
+        )
+
+    # 3. Construct and execute the INSERT statement for the sensor reading
+    columns = [
+        'timestamp', 'lp', 'v', 'gtt', 'gtn', 'ggn', 'ts', 'tp', 't48', 't1', 't2',
+        'p48', 'p1', 'p2', 'pexh', 'tic', 'mf', 'decay_coeff_comp', 'decay_coeff_turbine',
+        'turbine_id'
+    ]
+    placeholders = ', '.join('?' for _ in columns)
+    
+    data_to_insert = (
+        reading_data.timestamp.isoformat(), reading_data.lp, reading_data.v, reading_data.gtt, reading_data.gtn,
+        reading_data.ggn, reading_data.ts, reading_data.tp, reading_data.t48, reading_data.t1,
+        reading_data.t2, reading_data.p48, reading_data.p1, reading_data.p2, reading_data.pexh,
+        reading_data.tic, reading_data.mf, reading_data.decay_coeff_comp,
+        reading_data.decay_coeff_turbine, turbine_id
+    )
+    
+    try:
+        query = f"INSERT INTO sensor_readings ({', '.join(columns)}) VALUES ({placeholders})"
+        cursor.execute(query, data_to_insert)
+        
+        # 4. Commit transaction (saves both sensor reading and any alerts)
+        db.commit()
+        
+        # 5. Retrieve and return the newly inserted sensor record
+        new_record_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM sensor_readings WHERE id = ?", (new_record_id,))
+        new_record = cursor.fetchone()
+        return dict(new_record)
+        
+    except sqlite3.IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database error: {e}")
