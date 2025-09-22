@@ -59,7 +59,7 @@ def log_anomaly(turbine_id: int, timestamp: str, description: str, severity: str
     making it safe to call from the async upload endpoint.
     """
     with engine.connect() as connection:
-        with connection.begin(): # Start a transaction
+        with connection.begin(): 
             connection.execute(
                 sql_text("""
                     INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) 
@@ -117,7 +117,6 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
         missing_cols = [col for col in required_cols if col not in df.columns]
         raise HTTPException(status_code=400, detail=f"CSV is missing required columns: {missing_cols}")
 
-    # --- TRANSFORM ---
     df.drop_duplicates(inplace=True)
     for col in required_cols:
         if df[col].isnull().any():
@@ -135,9 +134,7 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
     df[numeric_cols] = df[numeric_cols].rolling(window=3, min_periods=1).mean()
     df['pressure_ratio'] = df['p2'] / df['p1']
     
-    # --- ANALYZE & ALERT ---
     alerts_found = []
-    # Add a temporary timestamp if not present for anomaly checking
     if 'timestamp' not in df.columns:
         df['timestamp'] = pd.to_datetime(pd.Timestamp.now()).strftime('%Y-%m-%d %H:%M:%S')
 
@@ -222,7 +219,6 @@ def get_analytics_report(filters: models.TimeFilterRequest = Body(...), db: sqli
     reports = {turbine_id: calculate_analytics(group) for turbine_id, group in df.groupby('turbine_id')}
     return reports
 
-# MODIFIED FUNCTION
 def calculate_analytics(df: pd.DataFrame):
     df.columns = df.columns.str.lower()
     gamma = 1.4
@@ -235,11 +231,9 @@ def calculate_analytics(df: pd.DataFrame):
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     def get_stats(series):
-        # Fill NaN values before calculating stats to avoid errors
         series.fillna(0, inplace=True)
         return models.Stats(min=series.min(), avg=series.mean(), max=series.max())
 
-    # Safely get min/max timestamps
     start_time = df['timestamp'].min()
     end_time = df['timestamp'].max()
 
@@ -275,17 +269,13 @@ def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreat
     """
     cursor = db.cursor()
     
-    # 1. Validate that the turbine_id exists
     cursor.execute("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = ?", (turbine_id,))
     if not cursor.fetchone():
         raise HTTPException(status_code=404, detail=f"Turbine with ID {turbine_id} not found.")
 
-    # 2. Check for anomalies based on thresholds before inserting
     
-    # Calculate pressure ratio for checking, handle potential division by zero
     pressure_ratio = reading_data.p2 / reading_data.p1 if reading_data.p1 != 0 else 0
     
-    # Check against thresholds and prepare any alerts
     if reading_data.t48 > 950:
         desc = f"Critical Turbine Exit Temperature: {reading_data.t48:.2f} °C"
         cursor.execute(
@@ -307,14 +297,13 @@ def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreat
             (turbine_id, reading_data.timestamp.isoformat(), desc, "Medium")
         )
         
-    if pressure_ratio < 9.0 and reading_data.gtn > 1500: # Check only when running at speed
+    if pressure_ratio < 9.0 and reading_data.gtn > 1500: 
         desc = f"Low Pressure Ratio at Speed: {pressure_ratio:.2f}"
         cursor.execute(
             "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
             (turbine_id, reading_data.timestamp.isoformat(), desc, "Low")
         )
 
-    # 3. Construct and execute the INSERT statement for the sensor reading
     columns = [
         'timestamp', 'lp', 'v', 'gtt', 'gtn', 'ggn', 'ts', 'tp', 't48', 't1', 't2',
         'p48', 'p1', 'p2', 'pexh', 'tic', 'mf', 'decay_coeff_comp', 'decay_coeff_turbine',
@@ -334,10 +323,8 @@ def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreat
         query = f"INSERT INTO sensor_readings ({', '.join(columns)}) VALUES ({placeholders})"
         cursor.execute(query, data_to_insert)
         
-        # 4. Commit transaction (saves both sensor reading and any alerts)
         db.commit()
         
-        # 5. Retrieve and return the newly inserted sensor record
         new_record_id = cursor.lastrowid
         cursor.execute("SELECT * FROM sensor_readings WHERE id = ?", (new_record_id,))
         new_record = cursor.fetchone()
