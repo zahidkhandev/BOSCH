@@ -1,43 +1,45 @@
+# app/models.py
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, datetime
 
-# --- Pagination Models (New) ---
+# --- Pagination Models ---
 class PaginationMetadata(BaseModel):
     total_items: int
     total_pages: int
     current_page: int
     page_size: int
 
-# --- Alert Models (Modified for Pagination) ---
+# --- Alert Models ---
 class AlertBase(BaseModel):
     turbine_id: int = Field(default=1)
-    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), example="2025-09-22T12:30:00Z")
-    metric: str = Field(..., example="t48")
-    alert_type: str = Field(..., example="Overheat")
-    severity: str = Field(..., example="High")
-    actual_value: float = Field(..., example=960.5)
-    threshold_value: float = Field(..., example=950.0)
-    description: str = Field(..., example="High pressure spike in compressor outlet.")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), json_schema_extra={"example": "2025-09-22T12:30:00Z"})
+    metric: str = Field(..., json_schema_extra={"example": "t48"})
+    alert_type: str = Field(..., json_schema_extra={"example": "Overheat"})
+    severity: str = Field(..., json_schema_extra={"example": "High"})
+    actual_value: float = Field(..., json_schema_extra={"example": 960.5})
+    threshold_value: float = Field(..., json_schema_extra={"example": 950.0})
+    description: str = Field(..., json_schema_extra={"example": "High pressure spike in compressor outlet."})
 
 class AlertCreate(AlertBase):
     pass
 
 class Alert(AlertBase):
     alert_id: int
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class PaginatedAlerts(BaseModel):
     data: List[Alert]
     metadata: PaginationMetadata
 
-
 # --- Turbine Models ---
 class TurbineBase(BaseModel):
-    location: Optional[str] = Field(None, example="North Sea Platform Alpha")
-    manufacturer: Optional[str] = Field(None, example="Siemens")
-    model: Optional[str] = Field(None, example="SGT-400")
+    location: Optional[str] = Field(None, json_schema_extra={"example": "North Sea Platform Alpha"})
+    manufacturer: Optional[str] = Field(None, json_schema_extra={"example": "Siemens"})
+    model: Optional[str] = Field(None, json_schema_extra={"example": "SGT-400"})
 
 class TurbineCreate(TurbineBase):
     pass
@@ -47,10 +49,11 @@ class TurbineUpdate(TurbineBase):
 
 class Turbine(TurbineBase):
     turbine_id: int
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
         
-# --- Turbine Reading Models (Modified for Pagination) ---
+# --- Turbine Reading Models ---
 class TurbineReading(BaseModel):
     lp: float
     v: float
@@ -71,13 +74,13 @@ class TurbineReading(BaseModel):
     decay_coeff_comp: float
     decay_coeff_turbine: float
     turbine_id: int
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class PaginatedTurbineReadings(BaseModel):
     data: List[TurbineReading]
     metadata: PaginationMetadata
-
 
 class TurbineReadingCreate(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
@@ -100,7 +103,7 @@ class TurbineReadingCreate(BaseModel):
     decay_coeff_comp: float
     decay_coeff_turbine: float
 
-# --- Health Summary & Analytics Models (Modified for Pagination) ---
+# --- Health Summary & Analytics Models ---
 class HealthSummary(BaseModel):
     turbine_id: int
     record_count: int
@@ -125,7 +128,6 @@ class HealthSummary(BaseModel):
 class PaginatedHealthSummary(BaseModel):
     data: List[HealthSummary]
     metadata: PaginationMetadata
-
 
 class Stats(BaseModel):
     min: float

@@ -4,10 +4,7 @@ from app import models
 from app.database import get_db
 import sqlite3
 
-router = APIRouter(
-    prefix="/turbines",
-    tags=["Turbine Management"]
-)
+router = APIRouter()
 
 @router.post("/", response_model=models.Turbine, status_code=201, summary="Create a New Turbine")
 def create_turbine(turbine: models.TurbineCreate, db: sqlite3.Connection = Depends(get_db)):
