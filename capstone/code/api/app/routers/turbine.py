@@ -2,8 +2,9 @@ import pandas as pd
 import io
 import sqlite3
 import numpy as np
+import math
 from typing import List, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Body
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Body, Query
 from app import models
 from app.database import get_db, engine
 from datetime import date
@@ -14,22 +15,85 @@ router = APIRouter(
     tags=["Turbine Data & Analytics"]
 )
 
-@router.get("/sensor-metrics/{turbine_id}", response_model=List[models.TurbineReading], summary="Get Recent Sensor Metrics (Phase 5)")
-def get_sensor_metrics(turbine_id: int, limit: int = 10, db: sqlite3.Connection = Depends(get_db)):
+# --- Helper function for logging to the existing 'alerts' table ---
+def log_anomaly_to_db(connection, turbine_id: int, timestamp: str, metric: str, alert_type: str, severity: str, actual: float, threshold: float, description: str):
+    """Helper to insert a detailed anomaly record into the alerts table."""
+    with connection.begin():
+        connection.execute(
+            sql_text("""
+                INSERT INTO alerts (turbine_id, timestamp, metric, alert_type, severity, actual_value, threshold_value, description) 
+                VALUES (:turbine_id, :timestamp, :metric, :alert_type, :severity, :actual_value, :threshold_value, :description)
+            """),
+            {
+                "turbine_id": turbine_id, "timestamp": timestamp, "metric": metric, "alert_type": alert_type,
+                "severity": severity, "actual_value": actual, "threshold_value": threshold, "description": description
+            }
+        )
+
+@router.get("/sensor-metrics/{turbine_id}", response_model=models.PaginatedTurbineReadings, summary="Get Recent Sensor Metrics with Pagination")
+def get_sensor_metrics(
+    turbine_id: int, 
+    page: int = Query(1, ge=1, description="Page number to retrieve"), 
+    page_size: int = Query(10, ge=1, le=100, description="Number of records per page"), 
+    db: sqlite3.Connection = Depends(get_db)
+):
+    """
+    Retrieves a paginated list of sensor readings for a specific turbine.
+    """
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM sensor_readings WHERE turbine_id = ? ORDER BY timestamp DESC LIMIT ?", (turbine_id, limit))
+    
+    # First, get the total count of items for the given turbine
+    cursor.execute("SELECT COUNT(*) FROM sensor_readings WHERE turbine_id = ?", (turbine_id,))
+    total_items = cursor.fetchone()[0]
+    total_pages = math.ceil(total_items / page_size)
+
+    # Then, fetch the paginated data
+    offset = (page - 1) * page_size
+    cursor.execute(
+        "SELECT * FROM sensor_readings WHERE turbine_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+        (turbine_id, page_size, offset)
+    )
     readings = cursor.fetchall()
-    if not readings:
-        raise HTTPException(status_code=404, detail=f"No sensor metrics found for turbine ID {turbine_id}.")
-    return [dict(row) for row in readings]
 
-@router.get("/health-summary", response_model=List[models.HealthSummary], summary="Get Enriched Health Summary for All Turbines (Phase 5)")
-def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
-    query = "SELECT * FROM sensor_readings"
-    df = pd.read_sql_query(query, db)
-    if df.empty:
-        raise HTTPException(status_code=404, detail="No health summary data found.")
+    return {
+        "data": [dict(row) for row in readings],
+         "metadata": {
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": len(readings)
+        },
+    }
 
+@router.get("/health-summary", response_model=models.PaginatedHealthSummary, summary="Get Paginated Health Summary for Turbines")
+def get_health_summary(
+    page: int = Query(1, ge=1, description="Page number of turbines to analyze"), 
+    page_size: int = Query(10, ge=1, le=50, description="Number of turbines per page"), 
+    db: sqlite3.Connection = Depends(get_db)
+):
+    """
+    Calculates and returns a health summary. The pagination is applied to the list of turbines
+    to ensure the calculation is performed on a manageable subset of data.
+    """
+    cursor = db.cursor()
+    cursor.execute("SELECT DISTINCT turbine_id FROM sensor_readings ORDER BY turbine_id")
+    turbine_ids = [row[0] for row in cursor.fetchall()]
+
+    total_items = len(turbine_ids)
+    total_pages = math.ceil(total_items / page_size)
+
+    offset = (page - 1) * page_size
+    paginated_ids = turbine_ids[offset : offset + page_size]
+
+    if not paginated_ids:
+        # This condition is met if the page number is out of bounds
+        return { "data": [], "metadata": {"total_items": total_items, "total_pages": total_pages, "current_page": page, "page_size": 0},}
+    
+    placeholders = ','.join('?' for _ in paginated_ids)
+    query = f"SELECT * FROM sensor_readings WHERE turbine_id IN ({placeholders})"
+    
+    df = pd.read_sql_query(query, db, params=paginated_ids)
+    
     gamma = 1.4
     k_to_c = 273.15
     
@@ -54,41 +118,30 @@ def get_health_summary(db: sqlite3.Connection = Depends(get_db)):
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     summary_groups = df.groupby('turbine_id').agg(
-        record_count=('mf', 'count'),
-        total_fuel_usage=('mf', 'sum'),
-        avg_shaft_torque_gtt=('gtt', 'mean'),
-        avg_exit_temp_t48=('t48', 'mean'),
-        avg_pressure_ratio=('pressure_ratio', 'mean'),
-        avg_thermal_efficiency_percent=('thermal_efficiency', 'mean'),
+        record_count=('mf', 'count'), total_fuel_usage=('mf', 'sum'),
+        avg_shaft_torque_gtt=('gtt', 'mean'), avg_exit_temp_t48=('t48', 'mean'),
+        avg_pressure_ratio=('pressure_ratio', 'mean'), avg_thermal_efficiency_percent=('thermal_efficiency', 'mean'),
         avg_compressor_efficiency_percent=('compressor_efficiency', 'mean'),
-        avg_compressor_decay=('decay_coeff_comp', 'mean'),
-        avg_turbine_decay=('decay_coeff_turbine', 'mean'),
-        avg_power_proxy_kw=('power_proxy_kw', 'mean'),
-        avg_total_decay_score=('total_decay_score', 'mean'),
-        avg_temp_ratio_t48_p48=('temp_ratio_t48_p48', 'mean'),
-        avg_temp_ratio_t1_p1=('temp_ratio_t1_p1', 'mean'),
-        avg_temp_ratio_t2_p2=('temp_ratio_t2_p2', 'mean'),
-        avg_torque_diff=('torque_diff', 'mean'),
-        avg_rpm_ratio_gtn_ggn=('rpm_ratio_gtn_ggn', 'mean'),
-        avg_fuel_per_rpm=('fuel_per_rpm', 'mean'),
+        avg_compressor_decay=('decay_coeff_comp', 'mean'), avg_turbine_decay=('decay_coeff_turbine', 'mean'),
+        avg_power_proxy_kw=('power_proxy_kw', 'mean'), avg_total_decay_score=('total_decay_score', 'mean'),
+        avg_temp_ratio_t48_p48=('temp_ratio_t48_p48', 'mean'), avg_temp_ratio_t1_p1=('temp_ratio_t1_p1', 'mean'),
+        avg_temp_ratio_t2_p2=('temp_ratio_t2_p2', 'mean'), avg_torque_diff=('torque_diff', 'mean'),
+        avg_rpm_ratio_gtn_ggn=('rpm_ratio_gtn_ggn', 'mean'), avg_fuel_per_rpm=('fuel_per_rpm', 'mean'),
         avg_total_prop_torque=('total_prop_torque', 'mean')
     ).reset_index()
 
-    return summary_groups.to_dict(orient='records')
+    results = summary_groups.to_dict(orient='records')
+    return {
+       
+        "data": results,
+         "metadata": {
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": len(results)
+        },
+    }
 
-def log_anomaly(turbine_id: int, timestamp: str, description: str, severity: str):
-    with engine.connect() as connection:
-        with connection.begin(): 
-            connection.execute(
-                sql_text("""
-                    INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) 
-                    VALUES (:turbine_id, :timestamp, :description, :severity)
-                """),
-                {
-                    "turbine_id": turbine_id, "timestamp": timestamp, 
-                    "description": description, "severity": severity
-                }
-            )
 
 @router.post("/upload-data/{turbine_id}", status_code=status.HTTP_201_CREATED, summary="Upload, Process, Store, and Analyze Data for Anomalies (ETL)")
 async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...)):
@@ -149,23 +202,24 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
     if 'timestamp' not in df.columns:
         df['timestamp'] = pd.to_datetime(pd.Timestamp.now()).strftime('%Y-%m-%d %H:%M:%S')
 
-    for index, row in df.iterrows():
-        if row['t48'] > 950:
-            desc = f"Critical Turbine Exit Temperature: {row['t48']:.2f} °C"
-            log_anomaly(turbine_id, row['timestamp'], desc, "High")
-            alerts_found.append(desc)
-        if row['decay_coeff_turbine'] < 0.96:
-            desc = f"Medium Turbine Decay Detected: {row['decay_coeff_turbine']:.4f}"
-            log_anomaly(turbine_id, row['timestamp'], desc, "Medium")
-            alerts_found.append(desc)
-        if row['decay_coeff_comp'] < 0.96:
-            desc = f"Medium Compressor Decay Detected: {row['decay_coeff_comp']:.4f}"
-            log_anomaly(turbine_id, row['timestamp'], desc, "Medium")
-            alerts_found.append(desc)
-        if row['pressure_ratio'] < 9.0 and row['gtn'] > 1500:
-            desc = f"Low Pressure Ratio at Speed: {row['pressure_ratio']:.2f}"
-            log_anomaly(turbine_id, row['timestamp'], desc, "Low")
-            alerts_found.append(desc)
+    with engine.connect() as connection:
+        for index, row in df.iterrows():
+            if row['t48'] > 950:
+                desc = f"Critical Turbine Exit Temperature: {row['t48']:.2f} °C"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "t48", "Overheat", "High", row['t48'], 950.0, desc)
+                alerts_found.append(desc)
+            if row['decay_coeff_turbine'] < 0.96:
+                desc = f"Medium Turbine Decay Detected: {row['decay_coeff_turbine']:.4f}"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "decay_coeff_turbine", "Component Decay", "Medium", row['decay_coeff_turbine'], 0.96, desc)
+                alerts_found.append(desc)
+            if row['decay_coeff_comp'] < 0.96:
+                desc = f"Medium Compressor Decay Detected: {row['decay_coeff_comp']:.4f}"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "decay_coeff_comp", "Component Decay", "Medium", row['decay_coeff_comp'], 0.96, desc)
+                alerts_found.append(desc)
+            if row['pressure_ratio'] < 9.0 and row['gtn'] > 1500:
+                desc = f"Low Pressure Ratio at Speed: {row['pressure_ratio']:.2f}"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "pressure_ratio", "Pressure Anomaly", "Low", row['pressure_ratio'], 9.0, desc)
+                alerts_found.append(desc)
 
     df = df.round(4)
     df['turbine_id'] = turbine_id
@@ -181,35 +235,72 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
         raise HTTPException(status_code=500, detail=f"Failed to load data into database: {e}")
 
 
-@router.post("/anomaly-alerts", response_model=models.AnomalyAlert, status_code=status.HTTP_201_CREATED, summary="Log a New Anomaly Alert (Phase 5)")
-def log_anomaly_alert(alert: models.AnomalyAlertCreate, db: sqlite3.Connection = Depends(get_db)):
+@router.post("/alerts", response_model=models.Alert, status_code=status.HTTP_201_CREATED, summary="Log a New Anomaly Alert")
+def log_alert(alert: models.AlertCreate, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
     try:
         cursor.execute(
-            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
-            (alert.turbine_id, alert.timestamp, alert.description, alert.severity)
+             """
+            INSERT INTO alerts (turbine_id, timestamp, metric, alert_type, severity, actual_value, threshold_value, description) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (alert.turbine_id, alert.timestamp, alert.metric, alert.alert_type, alert.severity, 
+             alert.actual_value, alert.threshold_value, alert.description)
         )
         db.commit()
         alert_id = cursor.lastrowid
-        return models.AnomalyAlert(id=alert_id, **alert.model_dump())
+        return models.Alert(alert_id=alert_id, **alert.model_dump())
     except sqlite3.IntegrityError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e}")
 
-@router.get("/anomaly-alerts", response_model=List[models.AnomalyAlert], summary="Get Anomaly Alerts with Date Filter")
-def get_anomaly_alerts(turbine_id: Optional[int] = None, start_date: Optional[date] = None, end_date: Optional[date] = None, db: sqlite3.Connection = Depends(get_db)):
+@router.get("/alerts", response_model=models.PaginatedAlerts, summary="Get Paginated Anomaly Alerts with Date Filter")
+def get_alerts(
+    turbine_id: Optional[int] = None, 
+    start_date: Optional[date] = None, 
+    end_date: Optional[date] = None, 
+    page: int = Query(1, ge=1, description="Page number to retrieve"), 
+    page_size: int = Query(10, ge=1, le=100, description="Number of records per page"), 
+    db: sqlite3.Connection = Depends(get_db)
+):
+    """
+    Retrieves a paginated list of alerts, with optional filters for turbine ID and date range.
+    """
     cursor = db.cursor()
-    query = "SELECT * FROM anomaly_alerts WHERE 1=1"
+    
+    # Build the WHERE clause and params for both count and data queries
+    where_clause = "WHERE 1=1"
     params = []
     if turbine_id:
-        query += " AND turbine_id = ?"
+        where_clause += " AND turbine_id = ?"
         params.append(turbine_id)
     if start_date and end_date:
-        query += " AND date(timestamp) BETWEEN ? AND ?"
+        where_clause += " AND date(timestamp) BETWEEN ? AND ?"
         params.extend([start_date.isoformat(), end_date.isoformat()])
+        
+    # Get total count with filters
+    count_query = f"SELECT COUNT(*) FROM alerts {where_clause}"
+    cursor.execute(count_query, params)
+    total_items = cursor.fetchone()[0]
+    total_pages = math.ceil(total_items / page_size)
+
+    # Get paginated data
+    offset = (page - 1) * page_size
+    data_query = f"SELECT * FROM alerts {where_clause} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+    params.extend([page_size, offset])
     
-    cursor.execute(query, params)
+    cursor.execute(data_query, params)
     alerts = cursor.fetchall()
-    return [dict(row) for row in alerts]
+    
+    return {
+      
+        "data": [dict(row) for row in alerts],
+        "metadata": {
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "current_page": page,
+            "page_size": len(alerts)
+        },
+    }
 
 @router.post("/analytics-report", response_model=Dict[int, models.TurbineAnalyticsReport], summary="Get Advanced Analytics Report")
 def get_analytics_report(filters: models.TimeFilterRequest = Body(...), db: sqlite3.Connection = Depends(get_db)):
@@ -309,33 +400,34 @@ def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreat
 
     
     pressure_ratio = reading_data.p2 / reading_data.p1 if reading_data.p1 != 0 else 0
+    timestamp_str = reading_data.timestamp.isoformat()
     
     if reading_data.t48 > 950:
         desc = f"Critical Turbine Exit Temperature: {reading_data.t48:.2f} °C"
         cursor.execute(
-            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
-            (turbine_id, reading_data.timestamp.isoformat(), desc, "High")
+            "INSERT INTO alerts (turbine_id, timestamp, metric, alert_type, severity, actual_value, threshold_value, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (turbine_id, timestamp_str, "t48", "Overheat", "High", reading_data.t48, 950.0, desc)
         )
 
     if reading_data.decay_coeff_turbine < 0.96:
         desc = f"Medium Turbine Decay Detected: {reading_data.decay_coeff_turbine:.4f}"
         cursor.execute(
-            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
-            (turbine_id, reading_data.timestamp.isoformat(), desc, "Medium")
+            "INSERT INTO alerts (turbine_id, timestamp, metric, alert_type, severity, actual_value, threshold_value, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (turbine_id, timestamp_str, "decay_coeff_turbine", "Component Decay", "Medium", reading_data.decay_coeff_turbine, 0.96, desc)
         )
 
     if reading_data.decay_coeff_comp < 0.96:
         desc = f"Medium Compressor Decay Detected: {reading_data.decay_coeff_comp:.4f}"
         cursor.execute(
-            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
-            (turbine_id, reading_data.timestamp.isoformat(), desc, "Medium")
+            "INSERT INTO alerts (turbine_id, timestamp, metric, alert_type, severity, actual_value, threshold_value, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (turbine_id, timestamp_str, "decay_coeff_comp", "Component Decay", "Medium", reading_data.decay_coeff_comp, 0.96, desc)
         )
         
     if pressure_ratio < 9.0 and reading_data.gtn > 1500: 
         desc = f"Low Pressure Ratio at Speed: {pressure_ratio:.2f}"
         cursor.execute(
-            "INSERT INTO anomaly_alerts (turbine_id, timestamp, description, severity) VALUES (?, ?, ?, ?)",
-            (turbine_id, reading_data.timestamp.isoformat(), desc, "Low")
+            "INSERT INTO alerts (turbine_id, timestamp, metric, alert_type, severity, actual_value, threshold_value, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (turbine_id, timestamp_str, "pressure_ratio", "Pressure Anomaly", "Low", pressure_ratio, 9.0, desc)
         )
 
     columns = [
@@ -367,3 +459,4 @@ def log_single_reading(turbine_id: int, reading_data: models.TurbineReadingCreat
     except sqlite3.IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Database error: {e}")
+

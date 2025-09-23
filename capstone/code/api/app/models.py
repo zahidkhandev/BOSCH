@@ -1,7 +1,39 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import date, timedelta, datetime
+from datetime import date, datetime
 
+# --- Pagination Models (New) ---
+class PaginationMetadata(BaseModel):
+    total_items: int
+    total_pages: int
+    current_page: int
+    page_size: int
+
+# --- Alert Models (Modified for Pagination) ---
+class AlertBase(BaseModel):
+    turbine_id: int = Field(default=1)
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), example="2025-09-22T12:30:00Z")
+    metric: str = Field(..., example="t48")
+    alert_type: str = Field(..., example="Overheat")
+    severity: str = Field(..., example="High")
+    actual_value: float = Field(..., example=960.5)
+    threshold_value: float = Field(..., example=950.0)
+    description: str = Field(..., example="High pressure spike in compressor outlet.")
+
+class AlertCreate(AlertBase):
+    pass
+
+class Alert(AlertBase):
+    alert_id: int
+    class Config:
+        from_attributes = True
+
+class PaginatedAlerts(BaseModel):
+    data: List[Alert]
+    metadata: PaginationMetadata
+
+
+# --- Turbine Models ---
 class TurbineBase(BaseModel):
     location: Optional[str] = Field(None, example="North Sea Platform Alpha")
     manufacturer: Optional[str] = Field(None, example="Siemens")
@@ -17,7 +49,8 @@ class Turbine(TurbineBase):
     turbine_id: int
     class Config:
         from_attributes = True
-
+        
+# --- Turbine Reading Models (Modified for Pagination) ---
 class TurbineReading(BaseModel):
     lp: float
     v: float
@@ -41,6 +74,33 @@ class TurbineReading(BaseModel):
     class Config:
         from_attributes = True
 
+class PaginatedTurbineReadings(BaseModel):
+    data: List[TurbineReading]
+    metadata: PaginationMetadata
+
+
+class TurbineReadingCreate(BaseModel):
+    timestamp: datetime = Field(default_factory=datetime.now)
+    lp: float
+    v: float
+    gtt: float
+    gtn: float
+    ggn: float
+    ts: float
+    tp: float
+    t48: float
+    t1: float
+    t2: float
+    p48: float
+    p1: float
+    p2: float
+    pexh: float
+    tic: float
+    mf: float
+    decay_coeff_comp: float
+    decay_coeff_turbine: float
+
+# --- Health Summary & Analytics Models (Modified for Pagination) ---
 class HealthSummary(BaseModel):
     turbine_id: int
     record_count: int
@@ -61,6 +121,11 @@ class HealthSummary(BaseModel):
     avg_rpm_ratio_gtn_ggn: float
     avg_fuel_per_rpm: float
     avg_total_prop_torque: float
+
+class PaginatedHealthSummary(BaseModel):
+    data: List[HealthSummary]
+    metadata: PaginationMetadata
+
 
 class Stats(BaseModel):
     min: float
@@ -115,41 +180,3 @@ class TimeFilterRequest(BaseModel):
     turbine_ids: List[int] = Field(default=[1])
     start_date: Optional[date] = Field(default=None, description="Optional start date for the report period.")
     end_date: Optional[date] = Field(default=None, description="Optional end date for the report period.")
-
-class AnomalyAlertBase(BaseModel):
-    turbine_id: int = Field(default=1)
-    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), example="2025-09-22T12:30:00Z")
-    description: str = Field(..., example="High pressure spike in compressor outlet.")
-    severity: str = Field(..., example="High")
-
-class AnomalyAlertCreate(AnomalyAlertBase):
-    pass
-
-class AnomalyAlert(AnomalyAlertBase):
-    id: int
-    class Config:
-        from_attributes = True
-
-class TurbineReadingBase(BaseModel):
-    timestamp: datetime = Field(default_factory=datetime.now)
-    lp: float
-    v: float
-    gtt: float
-    gtn: float
-    ggn: float
-    ts: float
-    tp: float
-    t48: float
-    t1: float
-    t2: float
-    p48: float
-    p1: float
-    p2: float
-    pexh: float
-    tic: float
-    mf: float
-    decay_coeff_comp: float
-    decay_coeff_turbine: float
-
-class TurbineReadingCreate(TurbineReadingBase):
-    pass
