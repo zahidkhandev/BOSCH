@@ -204,9 +204,26 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
 
     with engine.connect() as connection:
         for index, row in df.iterrows():
-            if row['t48'] > 950:
-                desc = f"Critical Turbine Exit Temperature: {row['t48']:.2f} °C"
-                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "t48", "Overheat", "High", row['t48'], 950.0, desc)
+            if row['t48'] > 600:
+                desc = f"T48={row['t48']:.2f}°C exceeds threshold"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "t48", "Overheat", "Critical", row['t48'], 600.0, desc)
+                alerts_found.append(desc)
+            if row['mf'] > 0.3:
+                desc = f"mf={row['mf']:.2f} kg/s exceeds threshold"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "mf", "High Fuel Flow", "Critical", row['mf'], 0.3, desc)
+                alerts_found.append(desc)
+            if row['ts'] > 50:
+                desc = f"ts={row['ts']:.2f} exceeds threshold"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "ts", "High Propeller Torque", "Critical", row['ts'], 50.0, desc)
+                alerts_found.append(desc)
+            if row['tp'] > 50:
+                desc = f"tp={row['tp']:.2f} exceeds threshold"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "tp", "High Propeller Torque", "Critical", row['tp'], 50.0, desc)
+                alerts_found.append(desc)
+
+            if 'pressure_ratio' in df.columns and row['pressure_ratio'] < 9.0 and row['gtn'] > 1500:
+                desc = f"Low Pressure Ratio at Speed: {row['pressure_ratio']:.2f}"
+                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "pressure_ratio", "Pressure Anomaly", "Low", row['pressure_ratio'], 9.0, desc)
                 alerts_found.append(desc)
             if row['decay_coeff_turbine'] < 0.96:
                 desc = f"Medium Turbine Decay Detected: {row['decay_coeff_turbine']:.4f}"
@@ -215,10 +232,6 @@ async def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(.
             if row['decay_coeff_comp'] < 0.96:
                 desc = f"Medium Compressor Decay Detected: {row['decay_coeff_comp']:.4f}"
                 log_anomaly_to_db(connection, turbine_id, row['timestamp'], "decay_coeff_comp", "Component Decay", "Medium", row['decay_coeff_comp'], 0.96, desc)
-                alerts_found.append(desc)
-            if row['pressure_ratio'] < 9.0 and row['gtn'] > 1500:
-                desc = f"Low Pressure Ratio at Speed: {row['pressure_ratio']:.2f}"
-                log_anomaly_to_db(connection, turbine_id, row['timestamp'], "pressure_ratio", "Pressure Anomaly", "Low", row['pressure_ratio'], 9.0, desc)
                 alerts_found.append(desc)
 
     df = df.round(4)

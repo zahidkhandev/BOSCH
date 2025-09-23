@@ -28,7 +28,6 @@
             <nav>
                 <ul class="space-y-2">
                     <li><a href="#introduction" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">Introduction</a></li>
-                    <li><a href="#authentication" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">Authentication</a></li>
                     <li><a href="#analytics-deep-dive" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">Analytics Deep Dive</a></li>
                     <li><a href="#etl-pipeline" class="sidebar-link block font-semibold text-lg py-1 px-2 rounded">ETL & Anomaly Detection</a></li>
                     
@@ -46,12 +45,12 @@
                         <h2 class="text-xl font-semibold mt-6 pt-3 border-t border-gray-600 text-white">Data & Analytics</h2>
                         <ul class="ml-4 space-y-1 mt-2">
                             <li><a href="#upload-etl" class="sidebar-link block py-1 px-2 rounded">POST /data/upload/{id}</a></li>
-                            <li><a href="#log-single-reading" class="sidebar-link block py-1 px-2 rounded">POST /data/reading/{id}</a></li>
-                            <li><a href="#get-sensor-metrics" class="sidebar-link block py-1 px-2 rounded">GET /data/metrics/{id}</a></li>
+                            <li><a href="#log-single-reading" class="sidebar-link block py-1 px-2 rounded">POST /data/sensor-reading/{id}</a></li>
+                            <li><a href="#get-sensor-metrics" class="sidebar-link block py-1 px-2 rounded">GET /data/sensor-metrics/{id}</a></li>
                             <li><a href="#get-health-summary" class="sidebar-link block py-1 px-2 rounded">GET /data/health-summary</a></li>
-                            <li><a href="#get-analytics-report" class="sidebar-link block py-1 px-2 rounded">POST /data/report</a></li>
-                            <li><a href="#log-anomaly" class="sidebar-link block py-1 px-2 rounded">POST /data/anomalies</a></li>
-                            <li><a href="#get-anomalies" class="sidebar-link block py-1 px-2 rounded">GET /data/anomalies</a></li>
+                            <li><a href="#get-analytics-report" class="sidebar-link block py-1 px-2 rounded">POST /data/analytics-report</a></li>
+                            <li><a href="#log-anomaly" class="sidebar-link block py-1 px-2 rounded">POST /data/alerts</a></li>
+                            <li><a href="#get-anomalies" class="sidebar-link block py-1 px-2 rounded">GET /data/alerts</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -74,55 +73,71 @@
 
             <section id="analytics-deep-dive" class="content-section mb-12">
                 <h1 class="text-3xl font-bold border-b pb-2 mb-4">Analytics & Formulas Deep Dive</h1>
-                <p class="mb-6 text-lg">Derived features are the most powerful aspect of this API. They are not measured by a single sensor but are calculated by combining multiple sensor inputs to provide a deeper insight into the engine's thermodynamic condition, performance, and overall health. 
-
-[Image of gas turbine schematic]
-</p>
+                <p class="mb-6 text-lg">Derived features are the most powerful aspect of this API. They are not measured by a single sensor but are calculated by combining multiple sensor inputs to provide a deeper insight into the engine's thermodynamic condition, performance, and overall health. </p>
+                <div class="mt-8 p-6 bg-white rounded-lg shadow-md mb-6">
+                    <h2 class="text-2xl font-bold mb-4">The Gas Turbine Thermodynamic Cycle (Brayton Cycle)</h2>
+                    <p class="mb-4 text-lg">At its core, the gas turbine operates on a thermodynamic principle known as the Brayton Cycle. Visualizing this cycle is key to understanding what the API metrics represent.</p>
+                    <ol class="list-decimal list-inside space-y-2 text-lg">
+                        <li><strong>Intake (Point 1):</strong> Ambient air is drawn into the engine's compressor. The state of this air is defined by the <strong>Compressor Inlet Temperature ($T_1$)</strong> and <strong>Inlet Pressure ($P_1$)</strong>.</li>
+                        <li><strong>Compression (Point 2):</strong> The compressor, driven by the turbine shaft, rapidly squeezes this air. This work increases the air's energy, resulting in a much higher <strong>Compressor Outlet Temperature ($T_2$)</strong> and <strong>Outlet Pressure ($P_2$)</strong>.</li>
+                        <li><strong>Combustion:</strong> In the combustor, fuel is continuously injected into the compressed air and ignited, creating a high-temperature, high-pressure gas.</li>
+                        <li><strong>Expansion (Point 4.8):</strong> This high-energy gas expands through the turbine section, forcing the turbine blades to spin at high speed. This rotation drives both the compressor at the front and the main output shaft (for propulsion or power generation). The temperature of the gas after it has done its work in the High-Pressure turbine is the <strong>HP Turbine Exit Temperature ($T_{48}$)</strong>.</li>
+                    </ol>
+                    <p class="mt-4 text-lg">The API's primary function is to calculate metrics that precisely measure the performance and health of the "Compression" and "Expansion" stages of this critical cycle.</p>
+                </div>
+                
 
                 <h2 class="text-2xl font-bold mb-4 mt-6">Core Thermodynamic Indicators</h2>
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-xl font-semibold mb-2">Pressure Ratio (πₚ)</h3>
                     <p class="mb-2"><strong>What it is:</strong> The fundamental measure of the compressor's work. It quantifies how much the air pressure is increased from the inlet to the outlet.</p>
-                    <p class="mb-2"><strong>Why it matters:</strong> A higher pressure ratio is directly linked to higher engine efficiency and power output. A drop in this value at a given speed can indicate compressor fouling (e.g., from salt spray ingestion) or physical damage to the blades.</p>
-                    <p class="mb-2"><strong>Real World Example:</strong> At a flank speed of 27 knots, a healthy GT compressor might achieve a pressure ratio of 12:1. If, after months of operation, this drops to 10.5:1 under the same conditions, it signifies a significant performance loss, likely requiring a compressor wash to restore efficiency.</p>
-                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <p class="mb-2"><strong>How It's Calculated:</strong></p>
                     <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\text{Pressure&space;Ratio&space;}=&space;\frac{P_2}{P_1}" class="formula-img" alt="Pressure Ratio Formula"/>
                     <ul class="list-disc list-inside mt-2 text-md">
                         <li><strong>P₂</strong>: Compressor Outlet Pressure (bar)</li>
                         <li><strong>P₁</strong>: Compressor Inlet Pressure (bar)</li>
+                    </ul>
+                    <p class="mt-4"><strong>What It Signifies:</strong></p>
+                    <ul class="list-disc list-inside mt-2 text-md">
+                        <li><strong>Core Performance Metric:</strong> The pressure ratio is the most significant factor influencing a gas turbine's potential power output and efficiency. Engines with higher pressure ratios are typically more powerful and efficient.</li>
+                        <li><strong>Compressor Health:</strong> For a given turbine speed (GTn), the compressor should achieve a predictable pressure ratio. If the engine must spin faster to achieve the same pressure ratio as when it was new, or if the ratio is lower at the same speed, it can indicate a health problem. Common causes include <strong>compressor fouling</strong> (buildup of dirt, salt, or industrial contaminants on the blades) or, more seriously, internal erosion or damage.</li>
                     </ul>
                 </div>
 
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-xl font-semibold mb-2">Thermal Efficiency (ηₜₕ)</h3>
                     <p class="mb-2"><strong>What it is:</strong> A theoretical measure of how efficiently the turbine converts fuel's heat energy into useful work, based on the ideal Brayton Cycle.</p>
-                    <p class="mb-2"><strong>Why it matters:</strong> It provides a benchmark for engine performance. While the actual efficiency will be lower due to real-world losses (friction, heat loss), tracking the trend of this ideal metric is crucial. As the pressure ratio drops due to degradation, the ideal thermal efficiency will also decrease, indicating the engine's maximum potential is diminishing.</p>
-                    <h4 class="font-semibold text-lg mb-1">Calculation:</h4>
+                    <p class="mb-2"><strong>How It's Calculated:</strong></p>
                     <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\eta_{th}&space;(\%)&space;=&space;\left(&space;1&space;-&space;\frac{1}{\pi_p^{(\gamma-1)/\gamma}}&space;\right)&space;\times&space;100" class="formula-img" alt="Thermal Efficiency Formula"/>
                     <ul class="list-disc list-inside mt-2 text-md">
                         <li><strong>πₚ</strong>: The Pressure Ratio calculated above.</li>
                         <li><strong>γ (Gamma)</strong>: The heat capacity ratio for air, a constant value of 1.4.</li>
                     </ul>
+                    <p class="mt-4"><strong>What It Signifies:</strong></p>
+                    <ul class="list-disc list-inside mt-2 text-md">
+                        <li><strong>Performance Benchmark:</strong> This value tells you the <em>maximum possible</em> efficiency your turbine could achieve for its design (as defined by its pressure ratio). The actual, real-world efficiency will always be lower due to friction, heat loss, and other factors.</li>
+                        <li><strong>Health Trending:</strong> Trending this value over time is extremely valuable. If the pressure ratio degrades due to fouling, the thermal efficiency will also decrease, providing a clear, quantifiable measure of the performance loss.</li>
+                    </ul>
                 </div>
                 
                 <div class="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h3 class="text-xl font-semibold mb-2">Compressor Isentropic Efficiency (η꜀)</h3>
-                    <p class="mb-2"><strong>What it is:</strong> The most direct indicator of the compressor's health. It compares the actual energy (measured by temperature rise) used to compress air with the ideal (frictionless, adiabatic) energy required.</p>
-                    <p class="mb-2"><strong>Why it matters:</strong> A drop in compressor efficiency means more energy is being wasted as heat, indicating problems like blade fouling or erosion. The compressor blades are tiny airfoils; salt, dust, and grime disrupt their aerodynamic shape, causing turbulence and friction. This wasted energy manifests as excess heat, which this formula precisely detects. A 2% drop here can directly correlate to a ~2% increase in fuel consumption. </p>
-                    <h4 class="font-semibold text-lg mb-1">Calculation (Two Steps):</h4>
+                    <p class="mb-2"><strong>What it is:</strong> The most direct indicator of the compressor's mechanical and aerodynamic health. It compares the actual energy required to compress the air with the energy that would be required in a perfect, frictionless, and heat-loss-free (isentropic) world.</p>
+                    <p class="mb-2"><strong>How It's Calculated:</strong> This is a two-step calculation.</p>
                     <ol class="list-decimal list-inside">
-                        <li class="mb-4">First, calculate the Ideal Outlet Temperature (T₂ₛ):
+                        <li class="mb-4">First, calculate the Ideal Outlet Temperature ($T_{2s}$):
                             <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}T_{2s}&space;=&space;T_1&space;\times&space;(\pi_p)^{(\gamma-1)/\gamma}" class="formula-img" alt="Ideal Outlet Temperature Formula"/>
                         </li>
                         <li>Then, calculate the efficiency by comparing the ideal temperature rise to the actual rise:
                             <img src="https://latex.codecogs.com/svg.latex?\dpi{150}\bg{white}\eta_c&space;(\%)&space;=&space;\left(&space;\frac{T_{2s}&space;-&space;T_1}{T_2&space;-&space;T_1}&space;\right)&space;\times&space;100" class="formula-img" alt="Compressor Efficiency Formula"/>
                         </li>
                     </ol>
+                    <p class="mt-4 text-md"><strong>Important Note on Temperatures:</strong> Thermodynamic formulas involving ratios require absolute temperature scales. The API code automatically converts all Celsius sensor readings (<code>t1</code>, <code>t2</code>) to Kelvin by adding <strong>273.15</strong> before performing these calculations.</p>
+                    <p class="mt-4"><strong>What It Signifies & The ">100% Anomaly":</strong></p>
                     <ul class="list-disc list-inside mt-2 text-md">
-                        <li><strong>T₁</strong>: Actual Compressor Inlet Temperature (from sensor `t1`).</li>
-                        <li><strong>T₂</strong>: Actual Compressor Outlet Temperature (from sensor `t2`).</li>
-                        <li><strong>T₂ₛ</strong>: The ideal (Isentropic) Outlet Temperature calculated in step 1.</li>
-                        <li><strong>Note:</strong> All temperatures are converted to Kelvin (°C + 273.15) for calculations.</li>
+                        <li>For any simple, real-world compressor, this value <strong>must be less than 100%</strong>. This is because real-world friction and turbulence (inefficiencies) always add extra heat, making the actual outlet temperature ($T_2$) higher than the ideal temperature ($T_{2s}$).</li>
+                        <li>Your dataset, however, produces results like <strong>160%</strong>. This is not a calculation error. It signifies that your simulator is modeling a highly advanced compression cycle, likely involving <strong>intercooling</strong>. Intercooling is a process where the air is deliberately cooled between stages of compression. This drastically lowers the final outlet temperature ($T_2$), making it appear <em>even cooler</em> than the ideal temperature from the simple formula.</li>
+                        <li><strong>How to Interpret:</strong> For your specific dataset, you should not treat this as an absolute efficiency value. Instead, treat it as a <strong>highly sensitive health index</strong>. A drop from a baseline of <strong>165%</strong> to <strong>155%</strong> is a very strong indicator of component degradation, even if the absolute numbers are physically unusual for a simple cycle.</li>
                     </ul>
                 </div>
 
@@ -197,11 +212,9 @@
                     <div class="mt-4">
                         <h4 class="font-semibold text-lg mb-1">A. Outlier Mitigation (IQR Capping)</h4>
                         <p>Sensor data can contain erroneous spikes. This pipeline identifies and corrects these outliers using the Interquartile Range (IQR) method. Any value outside 1.5 * IQR from the quartiles is capped at that limit, preserving the data point without skewing analysis.</p>
-                         <p class="mt-2"><strong>Example:</strong> A sensor glitch causes a single `T48` reading to be 2000°C, which is physically impossible. Instead of corrupting averages, IQR capping might bring this value down to a plausible maximum like 1100°C for that operational state.</p>
-                         
-
-[Image of Interquartile range boxplot]
-
+                        <p class="mt-2"><strong>Example:</strong> A sensor glitch causes a single `T48` reading to be 2000°C, which is physically impossible. Instead of corrupting averages, IQR capping might bring this value down to a plausible maximum like 1100°C for that operational state.</p>
+                        
+                        
                     </div>
                     <div class="mt-4">
                         <h4 class="font-semibold text-lg mb-1">B. Noise Reduction (Smoothing)</h4>
@@ -217,20 +230,32 @@
                     <h3 class="text-2xl font-semibold mb-2">Step 3: Automated Anomaly Detection</h3>
                     <p class="mb-2">After cleaning, each data point is checked against predefined operational thresholds. If a value exceeds a threshold, an anomaly is automatically logged.</p>
                     <h4 class="font-semibold text-lg mt-2 mb-1">Thresholds & Significance:</h4>
+                    <p class="mb-4">The following thresholds are applied during the batch upload process (<strong>POST /data/upload/{id}</strong>). For a single reading, a different set of critical alerts (e.g., `t48 > 950`) may be checked to prevent immediate engine damage.
+                    </p>
                     <div class="mt-2 p-4 bg-red-50 border border-red-200 rounded">
-                        <p><strong class="font-semibold text-red-700">High Severity: Critical Turbine Exit Temperature</strong></p>
-                        <p><strong>Threshold:</strong> `t48 > 1050` °C</p>
-                        <p><strong>Meaning:</strong> This is a critical alert. The turbine's hot section is under extreme thermal stress, which can lead to rapid material degradation (creep) and potentially catastrophic engine failure.</p>
+                        <p><strong class="font-semibold text-red-700">High Severity: Overheat</strong></p>
+                        <p><strong>Threshold:</strong> `t48 > 600` °C</p>
+                        <p><strong>Meaning:</strong> This indicates an exceptionally high turbine exit temperature, which can lead to rapid material degradation and potentially catastrophic failure if sustained. Immediate attention is required. This threshold is for a batch upload and is more conservative than the real-time check. </p>
+                    </div>
+                    <div class="mt-2 p-4 bg-red-50 border border-red-200 rounded">
+                        <p><strong class="font-semibold text-red-700">High Severity: High Fuel Flow</strong></p>
+                        <p><strong>Threshold:</strong> `mf > 0.3` kg/s</p>
+                        <p><strong>Meaning:</strong> A fuel flow rate above this threshold suggests an abnormal or unexpected operational state, which could be indicative of an injector issue or engine control problem. This is a critical alert for fuel system integrity and efficiency.</p>
+                    </div>
+                    <div class="mt-2 p-4 bg-red-50 border border-red-200 rounded">
+                        <p><strong class="font-semibold text-red-700">High Severity: High Propeller Torque</strong></p>
+                        <p><strong>Threshold:</strong> `ts > 50` kN/m or `tp > 50` kN/m</p>
+                        <p><strong>Meaning:</strong> A critical alert for the propeller shafts. Excessively high torque can lead to structural stress, potential shaft damage, or indicate a serious obstruction in the water. Requires immediate investigation.</p>
                     </div>
                     <div class="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                        <p><strong class="font-semibold text-yellow-700">Medium Severity: Significant Component Decay</strong></p>
-                        <p><strong>Threshold:</strong> `kMt < 0.975` or `kMc < 0.95`</p>
+                        <p><strong class="font-semibold text-yellow-700">Medium Severity: Component Decay</strong></p>
+                        <p><strong>Threshold:</strong> `decay_coeff_turbine < 0.96` or `decay_coeff_comp < 0.96`</p>
                         <p><strong>Meaning:</strong> The core components have degraded beyond an acceptable performance threshold. This is a strong signal that maintenance is required to prevent further efficiency loss and potential damage.</p>
                     </div>
-                     <div class="mt-2 p-4 bg-blue-50 border border-blue-200 rounded">
-                        <p><strong class="font-semibold text-blue-700">Low Severity: High Torque Differential</strong></p>
-                        <p><strong>Threshold:</strong> `Torque Differential > 5.0` (when `Ship Speed > 10 knots`)</p>
-                        <p><strong>Meaning:</strong> The propulsion system is unbalanced during steady cruising. This warrants investigation for potential hull fouling or propeller issues before it becomes a more serious problem affecting fuel efficiency and maneuverability.</p>
+                    <div class="mt-2 p-4 bg-blue-50 border border-blue-200 rounded">
+                        <p><strong class="font-semibold text-blue-700">Low Severity: Low Pressure Ratio at High Speed</strong></p>
+                        <p><strong>Threshold:</strong> `pressure_ratio < 9.0` (when `gtn > 1500`) </p>
+                        <p><strong>Meaning:</strong> During high-speed operation, the compressor should be generating a strong pressure ratio. A low value suggests a loss of efficiency, which could be due to fouling or minor damage. This warrants a more detailed look into the compressor's health.</p>
                     </div>
                 </div>
 
@@ -247,19 +272,19 @@
                 <p class="mb-4">Creates a new turbine record. This is the first step before uploading sensor data for a new asset.</p>
                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
                 <pre class="code-block"><code>{
-  "location": "Frigate F-101, Starboard Engine",
-  "manufacturer": "Rolls-Royce",
-  "model": "MT30",
-  "install_date": "2022-08-20"
+ "location": "Frigate F-101, Starboard Engine",
+ "manufacturer": "Rolls-Royce",
+ "model": "MT30",
+ "install_date": "2022-08-20"
 }</code></pre>
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>201 Created:</strong></p>
                 <pre class="code-block"><code>{
-  "turbine_id": 5,
-  "location": "Frigate F-101, Starboard Engine",
-  "manufacturer": "Rolls-Royce",
-  "model": "MT30",
-  "install_date": "2022-08-20"
+ "turbine_id": 5,
+ "location": "Frigate F-101, Starboard Engine",
+ "manufacturer": "Rolls-Royce",
+ "model": "MT30",
+ "install_date": "2022-08-20"
 }</code></pre>
             </section>
             
@@ -269,16 +294,16 @@
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
                 <pre class="code-block"><code>[
-  {
-    "turbine_id": 1,
-    "location": "Frigate F-99, Port Engine",
-    "model": "LM2500"
-  },
-  {
-    "turbine_id": 2,
-    "location": "Frigate F-99, Starboard Engine",
-    "model": "LM2500"
-  }
+ {
+  "turbine_id": 1,
+  "location": "Frigate F-99, Port Engine",
+  "model": "LM2500"
+ },
+ {
+  "turbine_id": 2,
+  "location": "Frigate F-99, Starboard Engine",
+  "model": "LM2500"
+ }
 ]</code></pre>
             </section>
 
@@ -288,31 +313,34 @@
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
                 <pre class="code-block"><code>{
-  "turbine_id": 1,
-  "location": "Frigate F-99, Port Engine",
-  "manufacturer": "General Electric",
-  "model": "LM2500",
-  "install_date": "2020-01-15",
-  "last_maintenance": "2023-05-10"
+ "turbine_id": 1,
+ "location": "Frigate F-99, Port Engine",
+ "manufacturer": "General Electric",
+ "model": "LM2500",
+ "install_date": "2020-01-15",
+ "last_maintenance": "2023-05-10"
 }</code></pre>
-                 <p class="mt-2"><strong>404 Not Found:</strong></p>
+                <p class="mt-2"><strong>404 Not Found:</strong></p>
                 <pre class="code-block"><code>{ "detail": "Turbine with ID 999 not found" }</code></pre>
             </section>
 
             <section id="update-turbine" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-put text-sm font-mono px-2 py-1 rounded-md mr-3">PUT</span>/turbines/{turbine_id}</h2>
-                <p class="mb-4">Updates the metadata for an existing turbine, such as logging a new maintenance date.</p>
-                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
+                <p class="mb-4">Updates the metadata for an existing turbine, such as logging a new maintenance date. This endpoint updates the entire turbine record and requires all fields.</p>
+                <h3 class="text-xl font-semibold mb-2">Request Body</h3>
                 <pre class="code-block"><code>{
-  "last_maintenance": "2024-01-20"
+  "location": "Frigate F-99, Port Engine",
+  "manufacturer": "General Electric",
+  "model": "LM2500"
 }</code></pre>
-                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
                 <pre class="code-block"><code>{
-  "turbine_id": 1,
-  "location": "Frigate F-99, Port Engine",
-  ...
-  "last_maintenance": "2024-01-20"
+ "turbine_id": 1,
+ "location": "Frigate F-99, Port Engine",
+ "manufacturer": "General Electric",
+ "model": "LM2500",
+ "install_date": "2020-01-15"
 }</code></pre>
             </section>
             
@@ -321,52 +349,122 @@
             <section id="upload-etl" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/upload/{turbine_id}</h2>
                 <p class="mb-4">Performs a full ETL pipeline on a batch of sensor data from a CSV file. See the <a href="#etl-pipeline" class="text-blue-600 hover:underline">ETL & Anomaly Detection</a> section for a full breakdown. Request body should be `multipart/form-data` with a file.</p>
-                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
                 <pre class="code-block"><code>{ 
-  "message": "Successfully processed 11904 records for turbine 1.",
-  "anomalies_detected": 42
+ "message": "Successfully processed and loaded 11904 records for turbine ID 1. Found and logged 42 anomalies.",
+ "anomalies_logged": [
+  "T48=620.12°C exceeds threshold",
+  "mf=0.35 kg/s exceeds threshold",
+  "tp=55.42 exceeds threshold",
+  "Low Pressure Ratio at Speed: 8.51"
+ ]
 }</code></pre>
             </section>
             
             <section id="log-single-reading" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/reading/{turbine_id}</h2>
-                <p class="mb-4">Logs a single, real-time sensor reading and automatically checks it against thresholds to log anomalies.</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/sensor-reading/{turbine_id}</h2>
+                <p class="mb-4">Logs a single, real-time sensor reading and automatically checks it against thresholds to log anomalies. This is ideal for streaming data from a live sensor feed.</p>
                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
                 <pre class="code-block"><code>{
+  "timestamp": "2024-03-22T14:30:00.123456",
   "lp": 8.2, "v": 20.1, "gtt": 21000.5, "gtn": 1850.2, "ggn": 7900.8,
-  "ts": 190.1, "tp": 192.3, "t48": 980.7, "t1": 25.0, "t2": 550.1,
+  "ts": 45.1, "tp": 48.3, "t48": 940.7, "t1": 25.0, "t2": 550.1,
   "p48": 4.3, "p1": 0.98, "p2": 10.5, "pexh": 1.02, "tic": 85.5,
-  "mf": 4.1, "kMc": 0.98, "kMt": 0.99
+  "mf": 0.28, "decay_coeff_comp": 0.965, "decay_coeff_turbine": 0.972
+}</code></pre>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>201 Created:</strong></p>
+                <pre class="code-block"><code>{
+  "lp": 8.2,
+  "v": 20.1,
+  "gtt": 21000.5,
+  "gtn": 1850.2,
+  "ggn": 7900.8,
+  "ts": 45.1,
+  "tp": 48.3,
+  "t48": 940.7,
+  "t1": 25.0,
+  "t2": 550.1,
+  "p48": 4.3,
+  "p1": 0.98,
+  "p2": 10.5,
+  "pexh": 1.02,
+  "tic": 85.5,
+  "mf": 0.28,
+  "decay_coeff_comp": 0.965,
+  "decay_coeff_turbine": 0.972,
+  "turbine_id": 1
 }</code></pre>
             </section>
             
             <section id="get-sensor-metrics" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/metrics/{turbine_id}</h2>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/sensor-metrics/{turbine_id}</h2>
                 <p class="mb-4">Retrieves recent sensor readings for a turbine, ideal for real-time dashboards. Supports pagination.</p>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p><strong>200 OK:</strong></p>
+                <pre class="code-block"><code>{
+  "data": [
+    {
+      "lp": 8.2, "v": 20.1, "gtt": 21000.5, "gtn": 1850.2, "ggn": 7900.8,
+      "ts": 45.1, "tp": 48.3, "t48": 940.7, "t1": 25.0, "t2": 550.1,
+      "p48": 4.3, "p1": 0.98, "p2": 10.5, "pexh": 1.02, "tic": 85.5,
+      "mf": 0.28, "decay_coeff_comp": 0.965, "decay_coeff_turbine": 0.972,
+      "turbine_id": 1
+    },
+    ...
+  ],
+  "metadata": {
+    "total_items": 15000,
+    "total_pages": 1500,
+    "current_page": 1,
+    "page_size": 10
+  }
+}</code></pre>
             </section>
             
             <section id="get-health-summary" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/health-summary</h2>
-                <p class="mb-4">Provides a high-level, lifetime-to-date scorecard for each turbine, including the average of all calculated performance and efficiency metrics.</p>
-                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
+                <p class="mb-4">Provides a high-level, lifetime-to-date scorecard for each turbine, including the average of all calculated performance and efficiency metrics. This endpoint is designed to provide a snapshot of the fleet's overall health and degradation trends, with pagination applied to the list of turbines.</p>
+                <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
-                <pre class="code-block"><code>[
-  {
-    "turbine_id": 1,
-    "location": "Frigate F-99, Port Engine",
-    "lifetime_avg_isentropic_efficiency": 88.5,
-    "lifetime_avg_sfc": 0.21,
-    "current_compressor_decay": 0.97,
-    "current_turbine_decay": 0.98,
-    "total_anomalies": 152
+                <pre class="code-block"><code>{
+  "data": [
+    {
+      "turbine_id": 1,
+      "record_count": 15200,
+      "total_fuel_usage": 3200.5,
+      "avg_shaft_torque_gtt": 19500.2,
+      "avg_exit_temp_t48": 875.4,
+      "avg_pressure_ratio": 9.8,
+      "avg_thermal_efficiency_percent": 34.5,
+      "avg_compressor_efficiency_percent": 88.1,
+      "avg_compressor_decay": 0.968,
+      "avg_turbine_decay": 0.971,
+      "avg_power_proxy_kw": 18750.0,
+      "avg_total_decay_score": 0.061,
+      "avg_temp_ratio_t48_p48": 203.4,
+      "avg_temp_ratio_t1_p1": 278.2,
+      "avg_temp_ratio_t2_p2": 548.9,
+      "avg_torque_diff": 2.5,
+      "avg_rpm_ratio_gtn_ggn": 0.235,
+      "avg_fuel_per_rpm": 0.0018,
+      "avg_total_prop_torque": 98.2
+    },
+    ...
+  ],
+  "metadata": {
+    "total_items": 5,
+    "total_pages": 1,
+    "current_page": 1,
+    "page_size": 5
   }
-]</code></pre>
+}</code></pre>
             </section>
             
             <section id="get-analytics-report" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/report</h2>
-                <p class="mb-4">Returns a detailed statistical report (min, avg, max, stddev) for every raw and derived metric. Filter by turbine IDs and/or a date range.</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/analytics-report</h2>
+                <p class="mb-4">Returns a detailed statistical report for a selected set of turbines, with min, avg, and max for every raw and derived metric. Filter by turbine IDs and/or a date range.</p>
                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
                 <pre class="code-block"><code>{
   "turbine_ids": [1, 2],
@@ -375,46 +473,102 @@
 }</code></pre>
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
-                 <pre class="code-block"><code>{
-  "report_period": "2023-10-01 to 2023-10-31",
-  "turbines_analyzed": [1, 2],
-  "metrics": {
-    "pressure_ratio": { "min": 3.1, "avg": 9.8, "max": 12.5, "stddev": 1.2 },
-    "comp_isentropic_efficiency": { "min": 85.2, "avg": 88.1, "max": 90.3, "stddev": 0.8 },
-    "power_proxy_kw": { "min": 5000, "avg": 18500, "max": 25000, "stddev": 3500 }
-  }
+                <pre class="code-block"><code>{
+  "1": {
+    "record_count": 5000,
+    "period_start": "2023-10-01",
+    "period_end": "2023-10-31",
+    "compressor_stats": {
+      "inlet_temp_t1": { "min": 20.0, "avg": 25.1, "max": 30.2 },
+      "outlet_temp_t2": { "min": 500.5, "avg": 550.3, "max": 601.1 },
+      "inlet_pressure_p1": { "min": 0.95, "avg": 0.98, "max": 1.01 },
+      "outlet_pressure_p2": { "min": 9.5, "avg": 10.2, "max": 11.5 },
+      "pressure_ratio": { "min": 9.5, "avg": 10.4, "max": 11.8 }
+    },
+    "turbine_stats": {
+      "exit_temp_t48": { "min": 850.5, "avg": 890.2, "max": 935.8 },
+      "exit_pressure_p48": { "min": 4.1, "avg": 4.5, "max": 4.9 },
+      "shaft_torque_gtt": { "min": 15000.0, "avg": 18500.5, "max": 22000.0 },
+      "rpm_gtn": { "min": 1200.0, "avg": 1800.5, "max": 2000.0 },
+      "generator_rpm_ggn": { "min": 5000.0, "avg": 7500.0, "max": 8100.0 },
+      "power_proxy_kw": { "min": 12560.0, "avg": 18840.5, "max": 24000.0 }
+    },
+    "efficiency_metrics": {
+      "thermal_efficiency_percent": { "min": 32.5, "avg": 35.1, "max": 38.0 },
+      "compressor_efficiency_percent": { "min": 85.2, "avg": 88.1, "max": 90.3 },
+      "fuel_per_rpm": { "min": 0.0015, "avg": 0.0018, "max": 0.0022 },
+      "rpm_ratio_gtn_ggn": { "min": 0.2, "avg": 0.24, "max": 0.28 }
+    },
+    "decay_metrics": {
+      "total_decay_score": { "min": 0.035, "avg": 0.05, "max": 0.07 }
+    },
+    "temp_pressure_ratios": {
+      "temp_ratio_t48_p48": { "min": 200.0, "avg": 204.5, "max": 209.0 },
+      "temp_ratio_t1_p1": { "min": 270.0, "avg": 278.2, "max": 285.5 },
+      "temp_ratio_t2_p2": { "min": 540.0, "avg": 550.0, "max": 560.0 }
+    },
+    "torque_metrics": {
+      "torque_diff": { "min": 0.1, "avg": 1.2, "max": 5.5 },
+      "total_prop_torque": { "min": 90.0, "avg": 98.5, "max": 110.0 }
+    }
+  },
+  "2": { ... }
 }</code></pre>
             </section>
             
             <section id="log-anomaly" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/anomalies</h2>
-                <p class="mb-4">Manually logs a new anomaly alert, for events observed outside of automated detection (e.g., unusual noise reported by crew).</p>
+                <h2 class="text-2xl font-bold mb-3"><span class="method-post text-sm font-mono px-2 py-1 rounded-md mr-3">POST</span>/data/alerts</h2>
+                <p class="mb-4">Manually logs a new anomaly alert, for events observed outside of automated detection (e.g., unusual noise reported by crew). Includes detailed information for a comprehensive record.</p>
                 <h3 class="text-xl font-semibold mb-2">Request Body</h3>
                 <pre class="code-block"><code>{
   "turbine_id": 2,
+  "timestamp": "2024-02-15T14:30:00.000Z",
+  "metric": "Vibration",
+  "alert_type": "Crew Report",
   "severity": "Medium",
-  "description": "Crew reported high-frequency vibration during maneuvering.",
-  "timestamp": "2024-02-15T14:30:00Z"
+  "actual_value": 7.8,
+  "threshold_value": 5.0,
+  "description": "Crew reported high-frequency vibration during maneuvering, no corresponding sensor data."
 }</code></pre>
             </section>
             
-             <section id="get-anomalies" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/anomalies</h2>
-                <p class="mb-4">Retrieves a list of logged anomaly alerts, with optional filters for `turbine_id` and a date range.</p>
+            <section id="get-anomalies" class="content-section mb-12 bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold mb-3"><span class="method-get text-sm font-mono px-2 py-1 rounded-md mr-3">GET</span>/data/alerts</h2>
+                <p class="mb-4">Retrieves a paginated list of all logged anomaly alerts, with optional filters for `turbine_id` and a date range.</p>
                 <h3 class="text-xl font-semibold mt-4 mb-2">Responses</h3>
                 <p><strong>200 OK:</strong></p>
-                <pre class="code-block"><code>[
-  {
-    "anomaly_id": 101,
-    "turbine_id": 1,
-    "timestamp": "2023-11-05T10:20:00Z",
-    "severity": "High",
-    "metric": "t48",
-    "value": 1055.2,
-    "threshold": 1050.0,
-    "description": "Critical Turbine Exit Temperature exceeded threshold."
+                <pre class="code-block"><code>{
+  "data": [
+    {
+      "alert_id": 101,
+      "turbine_id": 1,
+      "timestamp": "2023-11-05T10:20:00Z",
+      "metric": "t48",
+      "alert_type": "Overheat",
+      "severity": "Critical",
+      "actual_value": 625.8,
+      "threshold_value": 600.0,
+      "description": "T48=625.80°C exceeds threshold."
+    },
+    {
+      "alert_id": 102,
+      "turbine_id": 1,
+      "timestamp": "2023-11-05T10:25:00Z",
+      "metric": "decay_coeff_comp",
+      "alert_type": "Component Decay",
+      "severity": "Medium",
+      "actual_value": 0.955,
+      "threshold_value": 0.96,
+      "description": "Medium Compressor Decay Detected: 0.9550."
+    }
+  ],
+  "metadata": {
+    "total_items": 150,
+    "total_pages": 15,
+    "current_page": 1,
+    "page_size": 10
   }
-]</code></pre>
+}</code></pre>
             </section>
 
         </main>
