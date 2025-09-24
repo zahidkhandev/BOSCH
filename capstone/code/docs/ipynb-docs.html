@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In-Depth Guide to Turbine Health Analytics</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            line-height: 1.7;
+            margin: 0 auto;
+            max-width: 1100px;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        h1, h2, h3, h4 {
+            color: #003B46; /* Deep ocean blue */
+            margin-top: 1.5em;
+        }
+        h1 {
+            border-bottom: 4px solid #07575B; /* Teal accent */
+            padding-bottom: 10px;
+            font-size: 2.8em;
+            text-align: center;
+        }
+        h2 {
+            border-bottom: 2px solid #66A5AD; /* Lighter teal */
+            padding-bottom: 8px;
+            font-size: 2.2em;
+            margin-top: 40px;
+        }
+        h3 {
+            font-size: 1.6em;
+            border-bottom: 1px dashed #C4DFE6; /* Lightest teal */
+            padding-bottom: 5px;
+        }
+        h4 {
+           font-size: 1.3em;
+           color: #07575B;
+        }
+        .container {
+            padding: 25px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .section-separator {
+            border: 0;
+            height: 2px;
+            background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(7, 87, 91, 0.75), rgba(0, 0, 0, 0));
+            margin: 60px 0;
+        }
+        .code-box, .formula-box, .log-box {
+            background-color: #e9ecef;
+            border-left: 6px solid #007bff;
+            padding: 15px 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+            font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+            border-radius: 5px;
+        }
+        .log-box {
+            border-left-color: #28a745;
+            background-color: #222;
+            color: #eee;
+        }
+        .explanation, .real-world-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .real-world-box {
+            background-color: #e6f7ff; /* Light blue background */
+            border-left: 6px solid #1890ff; /* Strong blue accent */
+        }
+        strong, .key-term {
+            color: #0056b3;
+            font-weight: 600;
+        }
+        ul {
+            list-style-type: '✅  ';
+            padding-left: 20px;
+        }
+        details {
+            margin-top: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        summary {
+            font-weight: bold;
+            padding: 10px;
+            background-color: #f1f1f1;
+            cursor: pointer;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            display: block;
+            margin: 25px auto;
+        }
+    </style>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>In-Depth Guide to Ship Turbine Health Analytics</h1>
+
+    <div class="explanation">
+        <h4>Document Purpose</h4>
+        <p>This document provides a complete, step-by-step walkthrough of your Python notebook. The goal is to explain not just <strong>what</strong> each piece of code does, but <strong>why</strong> it's a crucial step in transforming raw sensor data into a clean, feature-rich dataset ready for advanced analytics and predictive maintenance modeling. We will focus on real-world interpretations from the perspective of a marine engineer or fleet operations manager.</p>
+    </div>
+
+    <hr class="section-separator">
+
+    <h2>Phase 1: Data Ingestion and Cleaning</h2>
+    <p>This initial phase is about taking the raw data stream from the ship's engine control room, structuring it, and treating common data quality issues like sensor dropouts, noise, and measurement errors.</p>
+
+    <h3>1.1 Data Ingestion from Raw Logs</h3>
+    <div class="explanation">
+        <h4>What It Does:</h4>
+        <p>The script reads raw, space-separated sensor logs from <code>data.txt</code>. This file represents the raw output from the ship's data logger. Since the file lacks headers, descriptive names are manually assigned to each column. The resulting DataFrame is then saved as a CSV for easier access.</p>
+        <h4>Why It's Important:</h4>
+        <p>This is the foundational step that converts an unstructured log, which is difficult to analyze, into a structured table (a DataFrame). This format is essential for any form of automated analysis, visualization, or machine learning.</p>
+    </div>
+    <details>
+        <summary>Click to view Code and Initial Data Output</summary>
+        <div class="code-box">
+            <pre>
+# Import libraries and define column names
+import pandas as pd
+import numpy as np
+columns = [
+    "index", "Lever position (Lp)", "Ship speed (V) [knots]",
+    # ... (all 18 column names)
+    "Compressor decay coefficient", "Turbine decay coefficient"
+]
+
+# Read, index, and assign column names
+df = pd.read_csv("./data/data.txt", sep=r'\\s+', header=None)
+df.index = df.index + 1
+df.reset_index(inplace=True)
+df.columns = columns
+df.to_csv("./data/turbine_data.csv", index=False)
+            </pre>
+        </div>
+        <div class="log-box">
+            <pre>
+# df.head() output:
+   index    Lp         V        GTT      GTn      GGn     Ts     Tp      T48   T1     T2      P48   P1     P2    Pex   TIC      mf  c_decay  t_decay
+1      1  1.138  3.000000   2.083000   704.50  2820.40  0.034  0.034  337.040  288  478.02  1.25020  0.98  2.5209  1.0122  0.0000  0.9999   1.0000
+2      2  1.138  3.000000   2.083000   704.50  2820.40  0.034  0.034  337.040  288  478.02  1.25020  0.98  2.5209  1.0122  0.0000  0.9999   1.0000
+3      3  1.138  3.000000   2.083000   704.50  2820.40  0.034  0.034  337.040  288  478.02  1.25020  0.98  2.5209  1.0122  0.0000  0.9999   1.0000
+4      4  1.138  3.000000   2.083000   704.50  2820.40  0.034  0.034  337.040  288  478.02  1.25020  0.98  2.5209  1.0122  0.0000  0.9999   1.0000
+5      5  2.088  5.000000  18.290000  1077.20  4306.90  0.280  0.280  388.920  288  520.10  1.46320  0.98  3.4071  1.0253  -0.0003  0.9999   1.0000
+            </pre>
+        </div>
+    </details>
+
+    <h3>1.2 Data Cleaning & Transformation</h3>
+    <div class="explanation">
+        <h4>What It Does:</h4>
+        <p>This crucial block applies a series of cleaning techniques. It fills missing values (nulls) using the <strong class="key-term">median</strong> of each column. It then manages extreme values (outliers) using the <strong class="key-term">Interquartile Range (IQR) method</strong>, which caps values at 1.5 * IQR above the 3rd quartile or below the 1st quartile. Finally, it applies a <strong class="key-term">rolling mean (moving average)</strong> to smooth out high-frequency noise.</p>
+    </div>
+    <div class="real-world-box">
+        <h4>⚓ Real-World Inference & Ship Operations</h4>
+        <p>On a ship, data is never perfect. Here's what these steps mean in practice:</p>
+        <ul>
+            <li><strong>Handling Nulls:</strong> A sensor might temporarily drop out due to a loose connection or network lag between the engine room and the bridge. Instead of having a gap, we fill it with the median, which is a reasonable estimate that prevents our analysis from crashing. It's a "best guess" to maintain a continuous data stream.</li>
+            <li><strong>Outlier Capping:</strong> Imagine the ship hits a large wave. The sudden jolt might cause a pressure sensor to register a momentary, unrealistic spike. This is a measurement error, not a real engine event. Deleting this point would lose information about what the engine was doing at that time. Capping the value preserves the data point while preventing the false spike from skewing our averages and graphs. In a real-time system, this spike would trigger an alarm for an engineer to check, but for historical analysis, capping is the right approach.</li>
+            <li><strong>Smoothing:</strong> A ship's engine is subject to constant vibration and the ship itself is pitching and rolling in the sea. This creates "noise" in the sensor readings. A rolling average smooths out this noise, allowing the crew to see the true, stable operating trend of the engine, rather than being distracted by insignificant, momentary fluctuations.</li>
+        </ul>
+    </div>
+
+    <hr class="section-separator">
+
+    <h2>Phase 2: Feature Engineering - Creating Actionable KPIs</h2>
+    <p>This is the most valuable step. We transform raw sensor readings into powerful Key Performance Indicators (KPIs) that directly describe the engine's health and efficiency. An experienced Chief Engineer thinks in terms of these KPIs, not just raw temperatures and pressures.</p>
+
+    <h3>2.1 Thermodynamic Performance Ratios</h3>
+    <div class="explanation">
+        <h4>What They Are:</h4>
+        <p>These features analyze the relationship between temperature and pressure at key stages of the turbine's thermodynamic cycle (the Brayton Cycle), which is the physics behind how the engine works.</p>
+        <ul>
+            <li><code>Temp_ratio_T2_P2</code> ($$T_2/P_2$$): A primary indicator of **Compressor Efficiency**.</li>
+            <li><code>Temp_ratio_T48_P48</code> ($$T_{48}/P_{48}$$): An indicator of **Turbine Health** and its ability to extract energy from the hot gas.</li>
+        </ul>
+    </div>
+    <div class="real-world-box">
+        <h4>⚓ Real-World Inference & Ship Operations</h4>
+        <p>An engineer monitoring the ship's performance dashboard would look at the trends of these ratios:</p>
+        <ul>
+            <li><strong>Rising <code>Temp_ratio_T2_P2</code>:</strong> If this value has been slowly increasing over the last 100 operating hours, it's a classic sign of **compressor fouling**. Salt from sea spray and microscopic dirt are building up on the compressor blades. This acts like insulation, making the compressor less efficient. It has to work harder (generating more heat, T2) to produce the same pressure output (P2). <strong>Action:</strong> The engineer would schedule an "offline compressor wash" at the next port call to clean the blades and restore efficiency, saving fuel. This is a prime example of predictive maintenance.</li>
+            <li><strong>Rising <code>Temp_ratio_T48_P48</code>:</strong> If this ratio starts to increase, it means the exhaust gas is hotter and at a higher pressure than it should be. This suggests the HP Turbine is not extracting energy effectively. The cause could be severe, such as **blade erosion** from sand/dust (common on routes near deserts) or **hot corrosion** from contaminants in the fuel. <strong>Action:</strong> This is a serious warning. It requires an urgent borescope inspection of the turbine blades and could lead to a major, expensive overhaul. Catching this trend early can prevent catastrophic failure at sea.</li>
+        </ul>
+    </div>
+    
+    <h3>2.2 Power, Torque, and Health KPIs</h3>
+    <div class="explanation">
+        <h4>What They Are:</h4>
+        <p>These are high-level KPIs that summarize the engine's output and overall condition.</p>
+        <ul>
+            <li><strong class="key-term">Power_Proxy_kW:</strong> An estimate of the turbine's mechanical power output in kilowatts (kW), calculated from torque and RPM. This is the ultimate measure of "how much work" the engine is doing.</li>
+            <li><strong class="key-term">Total_decay_score:</strong> A single, unified metric representing the combined health degradation of the compressor and turbine. A score of 0 means a brand-new, perfect engine. A higher score indicates greater wear and tear.</li>
+        </ul>
+    </div>
+    <div class="real-world-box">
+        <h4>⚓ Real-World Inference & Ship Operations</h4>
+        <ul>
+            <li><strong>Using <code>Power_Proxy_kW</code>:</strong> The ship's captain requests "Full Ahead." The engineer sets the lever position to 9. Based on the manufacturer's charts for a new engine, this should produce 20,000 kW. However, the dashboard shows the `Power_Proxy_kW` is only 18,500 kW. <strong>Inference:</strong> The engine is underperforming by 7.5%. This drop in performance directly translates to lower ship speed and higher fuel consumption to maintain a schedule. This single KPI instantly tells the crew the engine is not meeting its performance benchmark.</li>
+            <li><strong>Using <code>Total_decay_score</code>:</strong> A fleet manager in an office ashore looks at a dashboard for their 20 vessels. They see that the "MV Atlantic Voyager" has a decay score of 0.18, while the rest of the fleet is below 0.05. <strong>Inference:</strong> The engine on the "Atlantic Voyager" is significantly more degraded than the others. It's likely burning more fuel per mile and is at a higher risk of unexpected failure. <strong>Action:</strong> The manager can now make a data-driven decision to prioritize the "Atlantic Voyager" for its next major service, potentially re-routing it to a port with better maintenance facilities and allocating budget for replacement parts.</li>
+        </ul>
+    </div>
+    <details>
+        <summary>Click to view Feature Engineering Code and Final DataFrame</summary>
+        <div class="code-box">
+            <pre>
+# Example Feature Engineering Code
+df['Temp_ratio_T2_P2'] =  (df['Compressor outlet air temperature (T2) [°C]'] / 
+                          df['Compressor outlet air pressure (P2) [bar]']).round(2)
+                          
+df['Power_Proxy_kW'] = (df['Gas Turbine shaft torque (GTT) [kN/m]'] * (df['Gas Turbine revolutions (GTn) [rpm]'] * (2 * np.pi / 60))).round(2)
+                          
+df['Total_decay_score'] = ((1 - df['Compressor decay coefficient']) + (1 - df['Turbine decay coefficient'])).round(3)
+            </pre>
+        </div>
+        <div class="log-box">
+            <pre>
+# df.tail() after feature engineering
+       index     Lp      V     GTT     GTn     GGn     Ts     Tp    T48   T1      T2     P48   P1      P2    Pex    TIC     mf  c_decay  t_decay  Temp_ratio_T48_P48  ...
+9996   9996  9.000  15.0  62.213  2750.8  8511.2  4.702  4.702  722.9  288  640.83  4.526  0.98  11.235  1.161  0.733  0.252    0.975    0.950               159.7  ...
+9997   9997  9.000  15.0  62.213  2750.8  8511.2  4.702  4.702  722.9  288  640.83  4.526  0.98  11.235  1.161  0.733  0.252    0.975    0.950               159.7  ...
+9998   9998  9.000  15.0  62.213  2750.8  8511.2  4.702  4.702  722.9  288  640.83  4.526  0.98  11.235  1.161  0.733  0.252    0.975    0.950               159.7  ...
+9999   9999  9.000  15.0  62.213  2750.8  8511.2  4.702  4.702  722.9  288  640.83  4.526  0.98  11.235  1.161  0.733  0.252    0.975    0.950               159.7  ...
+10000 10000  9.000  15.0  62.213  2750.8  8511.2  4.702  4.702  722.9  288  640.83  4.526  0.98  11.235  1.161  0.733  0.252    0.975    0.950               159.7  ...
+            </pre>
+        </div>
+    </details>
+
+    <hr class="section-separator">
+
+    <h2>Phase 3: Exploratory Data Analysis (EDA)</h2>
+    <p>EDA is like a doctor examining a patient. We use statistics and charts to understand the "health" of our dataset, confirm the engine behaves as expected, and find hidden patterns.</p>
+
+    <h3>3.1 Correlation & Statistical Overview</h3>
+    <div class="explanation">
+        <h4>What It Does:</h4>
+        <p>The code generates a <strong class="key-term">statistical summary</strong> (`.describe()`) and a <strong class="key-term">correlation matrix</strong>, visualized as a heatmap.</p>
+        <h4>What the Heatmap Shows:</h4>
+        <p>The heatmap is a powerful tool to see relationships. Bright red means a strong positive correlation (when A goes up, B goes up), and bright blue means a strong negative correlation (when A goes up, B goes down).</p>
+    </div>
+    <div class="real-world-box">
+        <h4>⚓ Real-World Inference & Ship Operations</h4>
+        <p>An engineer would use this heatmap to verify the engine's control system is working logically. They would expect to see strong red correlations between:</p>
+        <ul>
+            <li><strong>Lever Position (Lp) & Fuel Flow (mf):</strong> Pushing the throttle forward should increase fuel flow. Check.</li>
+            <li><strong>Lever Position (Lp) & Gas Turbine Torque (GTT):</strong> More throttle should produce more torque. Check.</li>
+            <li><strong>GTT & Power_Proxy_kW:</strong> More torque should result in more power. Check.</li>
+        </ul>
+        <p>If any of these expected strong correlations were weak, it would be a major red flag indicating a serious problem with the fuel control system or a major mechanical failure. It's a fundamental sanity check.</p>
+    </div>
+    <img src="https://i.imgur.com/Qj04b4q.png" alt="Correlation Heatmap">
+    <details>
+        <summary>Click to view Statistical Summary (.describe() output)</summary>
+        <div class="log-box">
+            <pre>
+# df.describe() output
+             index           Lp            V          GTT          GTn          GGn  ... 
+count  10000.00000   10000.000000  10000.00000  10000.00000  10000.00000  10000.00000  ...
+mean    5000.50000       5.138435     10.28634     34.78622     1811.223     6585.341  ...
+std     2886.89568       2.618682      4.32832     21.84917      639.463     1495.213  ...
+min     1.000000       1.138000      3.00000      2.08300      704.500     2820.400  ...
+25%     2500.75000       2.750000      6.00000     19.53975     1231.200     4948.500  ...
+50%     5000.50000       5.148000     10.60000     33.85000     1741.600     6470.200  ...
+7t%     7500.25000       7.567000     15.00000     54.38000     2432.800     8004.100  ...
+max    10000.00000       9.000000     15.00000     72.31900     2750.800     8998.900  ...
+            </pre>
+        </div>
+    </details>
+
+    <hr class="section-separator">
+
+    <h2>Phase 4: SQL Database Operations</h2>
+    <p>Finally, we move from analyzing a single file to creating a robust, scalable database. This is how data is managed in a real enterprise setting, allowing multiple users and applications to access and query the ship's data efficiently.</p>
+    
+    <h3>4.1 Schema Design and Analysis Queries</h3>
+    <div class="explanation">
+        <h4>What It Does:</h4>
+        <p>A relational database schema is created with tables for <code>turbine_metadata</code>, <code>sensor_readings</code>, and <code>alerts</code>. The cleaned data is loaded, and then SQL queries are used to aggregate data (e.g., find average fuel flow per hour) and generate alerts based on predefined rules (e.g., if T48 > 750°C).</p>
+    </div>
+    <div class="real-world-box">
+        <h4>⚓ Real-World Inference & Ship Operations</h4>
+        <p>Storing data in a SQL database is a game-changer for operations:</p>
+        <ul>
+            <li><strong>Regulatory Compliance:</strong> A Port State Control officer boards the ship to check compliance with environmental regulations (MARPOL Annex VI). They ask for fuel consumption records for the voyage. Instead of digging through paper logbooks, the engineer can run a simple SQL query: `SELECT SUM(mf) FROM sensor_readings WHERE timestamp BETWEEN 'start_date' AND 'end_date'`. This provides a precise, auditable answer in seconds.</li>
+            <li><strong>Root Cause Analysis:</strong> A "High Turbine Vibration" alarm is triggered. The crew needs to know what happened *just before* the alarm. With SQL, they can instantly query all sensor readings for the 5 minutes leading up to the alert's timestamp, joining the `alerts` and `sensor_readings` tables. This helps them see if there was a sudden pressure drop or temperature spike that caused the vibration, dramatically speeding up troubleshooting.</li>
+            <li><strong>Fleet-Wide Benchmarking:</strong> The company's performance analyst wants to know which ship is the most fuel-efficient. They can run a SQL query across the databases of all ships in the fleet, calculating the average `Fuel_per_RPM` or `Power_Proxy_kW` per ton of fuel consumed. This allows for fair, data-driven comparisons of vessel and crew performance.</li>
+        </ul>
+    </div>
+    <img src="https://i.imgur.com/2s4jK94.png" alt="SQL Analysis Charts">
+    <details>
+        <summary>Click to view SQL Queries and Results</summary>
+        <div class="code-box">
+            <pre>
+-- Example SQL to find hourly fuel usage
+SELECT
+  strftime('%H', timestamp) as hour_of_day,
+  SUM(mf) as total_fuel_flow,
+  AVG(power_kw) as avg_power_output
+FROM sensor_readings
+WHERE turbine_id = 1
+GROUP BY hour_of_day
+ORDER BY hour_of_day;
+            </pre>
+        </div>
+        <div class="log-box">
+            <pre>
+# Python output of the SQL query
+  hour_of_day  total_fuel_flow  avg_power_output
+0          00        47.382000      6929.356262
+1          01        46.890000      6860.598289
+2          02        48.330000      7057.436313
+3          03        47.160000      6898.374289
+4          04        47.790000      6982.806289
+...
+            </pre>
+        </div>
+    </details>
+
+    <h2>Conclusion</h2>
+    <p>This project successfully demonstrates a complete data pipeline for marine engine health monitoring. It begins with raw, noisy sensor logs and systematically cleans, enriches, and analyzes them. The final output is a structured, queryable database that provides high-level, actionable KPIs like power output, thermodynamic efficiency, and an overall health score. This transforms raw data from a simple record into a powerful tool for enhancing safety, improving fuel efficiency, and enabling data-driven predictive maintenance for maritime assets.</p>
+
+</div>
+
+</body>
+</html>

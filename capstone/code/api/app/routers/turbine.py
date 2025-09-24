@@ -187,7 +187,7 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
         df['timestamp'] = pd.to_datetime(pd.Timestamp.now()).strftime('%Y-%m-%d %H:%M:%S')
 
     alerts_to_log = []
-    t48_alerts = df[df['t48'] > 600].copy()
+    t48_alerts = df[df['t48'] > 900].copy()
     if not t48_alerts.empty:
         t48_alerts['metric'], t48_alerts['alert_type'], t48_alerts['severity'] = 't48', 'Overheat', 'Critical'
         t48_alerts['actual_value'], t48_alerts['threshold_value'] = t48_alerts['t48'], 900.0
