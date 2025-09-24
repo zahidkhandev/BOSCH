@@ -1,17 +1,14 @@
-# app/models.py
 
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, datetime
 
-# --- Pagination Models ---
 class PaginationMetadata(BaseModel):
     total_items: int
     total_pages: int
     current_page: int
     page_size: int
 
-# --- Alert Models ---
 class AlertBase(BaseModel):
     turbine_id: int = Field(default=1)
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), json_schema_extra={"example": "2025-09-22T12:30:00Z"})
@@ -35,7 +32,6 @@ class PaginatedAlerts(BaseModel):
     data: List[Alert]
     metadata: PaginationMetadata
 
-# --- Turbine Models ---
 class TurbineBase(BaseModel):
     location: Optional[str] = Field(None, json_schema_extra={"example": "North Sea Platform Alpha"})
     manufacturer: Optional[str] = Field(None, json_schema_extra={"example": "Siemens"})
@@ -53,7 +49,6 @@ class Turbine(TurbineBase):
         "from_attributes": True
     }
         
-# --- Turbine Reading Models ---
 class TurbineReading(BaseModel):
     lp: float
     v: float
@@ -103,7 +98,6 @@ class TurbineReadingCreate(BaseModel):
     decay_coeff_comp: float
     decay_coeff_turbine: float
 
-# --- Health Summary & Analytics Models ---
 class HealthSummary(BaseModel):
     turbine_id: int
     record_count: int

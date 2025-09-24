@@ -1,5 +1,3 @@
-# tests/integration/test_data_api.py
-
 import io
 from fastapi.testclient import TestClient
 
@@ -9,7 +7,6 @@ def test_upload_csv_success_with_normal_data(client: TestClient):
     """
     csv_data = (
         "Lever position (lp),Ship speed (v) [knots],Gas Turbine shaft torque (gtt) [kn/m],Gas Turbine revolutions (gtn) [rpm],Gas Generator revolutions (ggn) [rpm],Starboard Propeller Torque (ts) [kn/m],Port Propeller Torque (tp) [kn/m],HP Turbine exit temperature (t48) [°c],Compressor inlet air temperature (t1) [°c],Compressor outlet air temperature (t2) [°c],HP Turbine exit pressure (p48) [bar],Compressor inlet air pressure (p1) [bar],Compressor outlet air pressure (p2) [bar],Exhaust gas pressure [bar],Turbine Injection Control (tic) [%],Fuel flow (mf) [kg/s],Compressor decay coefficient,Turbine decay coefficient\n"
-        # MODIFIED: Changed mf from 0.4 to 0.25 to be non-anomalous
         "5.1,15,5000,3500,9000,55,56,650,20,500,1.2,1,10,1.01,80,0.25,0.99,0.99\n"
     )
     csv_bytes = io.BytesIO(csv_data.encode('utf-8'))
@@ -24,7 +21,6 @@ def test_upload_csv_with_anomalous_data_creates_alert(client: TestClient):
     """
     Tests that uploading a CSV with anomalous data (high T48) successfully creates an alert.
     """
-    # This data row has a T48 value of 960, which should trigger an "Overheat" alert.
     csv_data = (
         "Lever position (lp),"
         "Ship speed (v) [knots],"

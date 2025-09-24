@@ -1,5 +1,3 @@
-# conftest.py
-
 import pytest
 import sqlite3
 import sys
@@ -7,10 +5,8 @@ import os
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
-# This setup allows tests to find your application code
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Import the main app object and the items we need to patch
 from main import app
 from app import database
 from app.database import get_db
@@ -20,11 +16,9 @@ def client(tmp_path, monkeypatch):
     """
     This is the master fixture that sets up a fully isolated test environment.
     """
-    # 1. Define the path for a temporary database file for this specific test
     TEST_DB_PATH = tmp_path / "test_turbine_data.db"
     TEST_DB_URL = f"sqlite:///{TEST_DB_PATH}"
 
-    # 2. Create a temporary connection and schema
     conn = sqlite3.connect(TEST_DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -36,14 +30,11 @@ def client(tmp_path, monkeypatch):
     conn.commit()
     conn.close()
 
-    # 3. Create a temporary SQLAlchemy engine that points to our test DB
     test_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
 
-    # 4. Use monkeypatch to replace the real database objects with our temporary ones
     monkeypatch.setattr(database, "DATABASE_PATH", TEST_DB_PATH)
     monkeypatch.setattr(database, "engine", test_engine)
 
-    # 5. Override the get_db dependency to use the temporary database connection
     def override_get_db():
         db_conn = sqlite3.connect(TEST_DB_PATH, check_same_thread=False)
         db_conn.row_factory = sqlite3.Row
@@ -54,8 +45,6 @@ def client(tmp_path, monkeypatch):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # 6. Yield the test client
     yield TestClient(app)
 
-    # Teardown: Clear the dependency overrides
     app.dependency_overrides.clear()

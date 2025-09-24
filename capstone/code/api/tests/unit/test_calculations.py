@@ -13,5 +13,4 @@ def test_calculate_analytics_logic():
     sample_df = pd.DataFrame(data)
     report = calculate_analytics(sample_df)
     
-    # Corrected: Assert against the correct value in Watts
     assert abs(report.turbine_stats.power_proxy_kw.avg - 376991.11) < 1.0

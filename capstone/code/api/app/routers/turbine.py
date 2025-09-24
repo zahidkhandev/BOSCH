@@ -12,7 +12,6 @@ from sqlalchemy.sql import text as sql_text
 
 router = APIRouter()
 
-# --- Helper function for logging to the existing 'alerts' table ---
 def log_anomaly_to_db(connection, turbine_id: int, timestamp: str, metric: str, alert_type: str, severity: str, actual: float, threshold: float, description: str):
     """Helper to insert a detailed anomaly record into the alerts table."""
     with connection.begin():
@@ -39,12 +38,10 @@ def get_sensor_metrics(
     """
     cursor = db.cursor()
     
-    # First, get the total count of items for the given turbine
     cursor.execute("SELECT COUNT(*) FROM sensor_readings WHERE turbine_id = ?", (turbine_id,))
     total_items = cursor.fetchone()[0]
     total_pages = math.ceil(total_items / page_size)
 
-    # Then, fetch the paginated data
     offset = (page - 1) * page_size
     cursor.execute(
         "SELECT * FROM sensor_readings WHERE turbine_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
@@ -83,7 +80,6 @@ def get_health_summary(
     paginated_ids = turbine_ids[offset : offset + page_size]
 
     if not paginated_ids:
-        # This condition is met if the page number is out of bounds
         return { "data": [], "metadata": {"total_items": total_items, "total_pages": total_pages, "current_page": page, "page_size": 0},}
     
     placeholders = ','.join('?' for _ in paginated_ids)
@@ -142,7 +138,6 @@ def get_health_summary(
 
 @router.post("/upload-data/{turbine_id}", status_code=status.HTTP_201_CREATED, summary="Upload, Process, Store, and Analyze Data for Anomalies (ETL)")
 def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), db: sqlite3.Connection = Depends(get_db)):
-    # --- Step 1: Data Loading and Validation ---
     cursor = db.cursor()
     cursor.execute("SELECT turbine_id FROM turbine_metadata WHERE turbine_id = ?", (turbine_id,))
     if not cursor.fetchone():
@@ -152,14 +147,12 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
         raise HTTPException(status_code=400, detail="Invalid file type.")
 
     try:
-        # MODIFIED: Removed 'await' as this is now a sync function
         contents = file.file.read()
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         df.rename(columns=lambda x: x.lower().strip(), inplace=True)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read or parse CSV file: {e}")
 
-    # --- Step 2: Data Cleaning and Preprocessing (remains the same) ---
     column_mapping = {
         "lever position (lp)": "lp", "ship speed (v) [knots]": "v", "gas turbine shaft torque (gtt) [kn/m]": "gtt",
         "gas turbine revolutions (gtn) [rpm]": "gtn", "gas generator revolutions (ggn) [rpm]": "ggn",
@@ -178,7 +171,6 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
         missing_cols = [col for col in required_cols if col not in df.columns]
         raise HTTPException(status_code=400, detail=f"CSV is missing required columns: {missing_cols}")
 
-    # ... (the rest of the data cleaning logic remains the same) ...
     df.drop_duplicates(inplace=True)
     for col in required_cols:
         if df[col].isnull().any():
@@ -194,11 +186,9 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
     if 'timestamp' not in df.columns:
         df['timestamp'] = pd.to_datetime(pd.Timestamp.now()).strftime('%Y-%m-%d %H:%M:%S')
 
-    # --- Step 3: Vectorized Anomaly Detection (remains the same) ---
     alerts_to_log = []
-    t48_alerts = df[df['t48'] > 900].copy()
+    t48_alerts = df[df['t48'] > 600].copy()
     if not t48_alerts.empty:
-        # ... (t48 alert logic is correct)
         t48_alerts['metric'], t48_alerts['alert_type'], t48_alerts['severity'] = 't48', 'Overheat', 'Critical'
         t48_alerts['actual_value'], t48_alerts['threshold_value'] = t48_alerts['t48'], 900.0
         t48_alerts['description'] = t48_alerts.apply(lambda row: f"T48={row['t48']:.2f}°C exceeds threshold", axis=1)
@@ -206,13 +196,11 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
     
     mf_alerts = df[df['mf'] > 0.3].copy()
     if not mf_alerts.empty:
-        # ... (mf alert logic is correct)
         mf_alerts['metric'], mf_alerts['alert_type'], mf_alerts['severity'] = 'mf', 'High Fuel Flow', 'Critical'
         mf_alerts['actual_value'], mf_alerts['threshold_value'] = mf_alerts['mf'], 0.3
         mf_alerts['description'] = mf_alerts.apply(lambda row: f"mf={row['mf']:.2f} kg/s exceeds threshold", axis=1)
         alerts_to_log.append(mf_alerts)
 
-    # --- Step 4 & 5: Batch Insert Data and Anomalies ---
     alerts_found = 0
     try:
         if alerts_to_log:
@@ -221,16 +209,14 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
             all_alerts_df['turbine_id'] = turbine_id
             final_alerts_df = all_alerts_df[alert_cols]
             alerts_found = len(final_alerts_df)
-            # MODIFIED: Use 'db' connection, which is transaction-safe with the rest of the app
             final_alerts_df.to_sql('alerts', con=db, if_exists='append', index=False)
 
         df = df.round(4)
         df['turbine_id'] = turbine_id
         load_df = df[required_cols + ['turbine_id']]
-        # MODIFIED: Use 'db' connection here as well for consistency
         load_df.to_sql('sensor_readings', con=db, if_exists='append', index=False)
 
-        db.commit() # Commit all changes at once
+        db.commit()
         
         response_message = f"Successfully processed and loaded {len(load_df)} records for turbine ID {turbine_id}."
         if alerts_found > 0:
@@ -238,7 +224,7 @@ def upload_sensor_data_from_csv(turbine_id: int, file: UploadFile = File(...), d
         return {"message": response_message, "anomalies_logged_count": alerts_found}
 
     except Exception as e:
-        db.rollback() # Rollback on error
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to load data into database: {e}")
 
 
@@ -274,7 +260,6 @@ def get_alerts(
     """
     cursor = db.cursor()
     
-    # Build the WHERE clause and params for both count and data queries
     where_clause = "WHERE 1=1"
     params = []
     if turbine_id:
@@ -284,13 +269,11 @@ def get_alerts(
         where_clause += " AND date(timestamp) BETWEEN ? AND ?"
         params.extend([start_date.isoformat(), end_date.isoformat()])
         
-    # Get total count with filters
     count_query = f"SELECT COUNT(*) FROM alerts {where_clause}"
     cursor.execute(count_query, params)
     total_items = cursor.fetchone()[0]
     total_pages = math.ceil(total_items / page_size)
 
-    # Get paginated data
     offset = (page - 1) * page_size
     data_query = f"SELECT * FROM alerts {where_clause} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
     params.extend([page_size, offset])
